@@ -1,0 +1,152 @@
+/**
+ * Admin CSS for MWM Visual Teams
+ */
+
+/* Total Price Calculation Field */
+.option-total-calculation {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.option-total-calculation.enabled {
+    background: #f0f8ff;
+    border-color: #b3d9ff;
+}
+
+.option-total-calculation label {
+    font-weight: 600;
+    color: #23282d;
+    margin-bottom: 8px;
+    display: block;
+    font-size: 14px;
+}
+
+.option-total-calculation .description {
+    margin-top: 8px;
+    color: #666;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* YITH Plugin Framework On/Off Switch */
+.yith-plugin-fw-onoff-container {
+    display: inline-block;
+    vertical-align: middle;
+    position: relative;
+}
+
+.yith-plugin-fw-onoff {
+    display: none;
+}
+
+.yith-plugin-fw-onoff_handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 20px;
+    background: #ccc;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.3s ease;
+}
+
+.yith-plugin-fw-onoff:checked + .yith-plugin-fw-onoff_handle {
+    background: #0073aa;
+}
+
+.yith-plugin-fw-onoff_handle::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.yith-plugin-fw-onoff:checked + .yith-plugin-fw-onoff_handle::before {
+    transform: translateX(20px);
+}
+
+.yith-plugin-fw-onoff_icon {
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: opacity 0.3s ease;
+}
+
+.yith-plugin-fw-onoff_icon--on {
+    left: 6px;
+    opacity: 0;
+}
+
+.yith-plugin-fw-onoff_icon--off {
+    right: 6px;
+    opacity: 1;
+}
+
+.yith-plugin-fw-onoff:checked + .yith-plugin-fw-onoff_handle .yith-plugin-fw-onoff_icon--on {
+    opacity: 1;
+}
+
+.yith-plugin-fw-onoff:checked + .yith-plugin-fw-onoff_handle .yith-plugin-fw-onoff_icon--off {
+    opacity: 0;
+}
+
+.yith-plugin-fw-onoff_zero-width-space {
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+/* Total Calculation Info Box */
+.total-calculation-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    color: #0066cc;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.total-calculation-info strong {
+    color: #004499;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .option-total-calculation {
+        padding: 12px;
+    }
+    
+    .option-total-calculation label {
+        font-size: 13px;
+    }
+    
+    .yith-plugin-fw-onoff_handle {
+        width: 36px;
+        height: 18px;
+    }
+    
+    .yith-plugin-fw-onoff_handle::before {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .yith-plugin-fw-onoff:checked + .yith-plugin-fw-onoff_handle::before {
+        transform: translateX(18px);
+    }
+} 

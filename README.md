@@ -33,8 +33,20 @@ Plugin personalizado para WooCommerce que permite configurar opciones de product
 ```
 mwm-visualteams/
 ├── README.md
-├── [archivos del plugin]
-└── [documentación adicional]
+├── mwm-visualteams.php              # Archivo principal del plugin
+├── includes/
+│   ├── index.php
+│   ├── class-mwm-visualteams-admin.php    # Funcionalidad del panel de administración
+│   ├── class-mwm-visualteams-cart.php     # Lógica de cálculos en el carrito
+│   └── class-mwm-visualteams-frontend.php # Funcionalidad del frontend
+└── assets/
+    ├── index.php
+    ├── css/
+    │   ├── admin.css                # Estilos del panel de administración
+    │   └── frontend.css             # Estilos del frontend
+    └── js/
+        ├── admin.js                 # JavaScript del panel de administración
+        └── frontend.js              # JavaScript del frontend
 ```
 
 ## Instalación
