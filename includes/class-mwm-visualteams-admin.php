@@ -57,13 +57,21 @@ class MWM_VisualTeams_Admin {
         
         .yith-plugin-fw-onoff_handle {
             position: absolute;
-            left: 2px;
-            width: 16px;
-            height: 16px;
+            left: 1px;
+            width: 20px;
+            height: 20px;
             background: white;
             border-radius: 50%;
             transition: transform 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px -1px rgba(0, 0, 0, .1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            top: 1px;
+        }
+        
+        .yith-plugin-fw-onoff_handle::before {
+            content: none !important;
         }
         
         .on_off:checked + .yith-plugin-fw-onoff .yith-plugin-fw-onoff_handle {
@@ -71,22 +79,26 @@ class MWM_VisualTeams_Admin {
         }
         
         .yith-plugin-fw-onoff_icon {
-            width: 12px;
-            height: 12px;
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
+            width: 15px;
+            height: 15px;
             transition: opacity 0.3s ease;
         }
         
         .yith-plugin-fw-onoff_icon--on {
-            left: 6px;
             opacity: 0;
+            fill: none;
+            stroke: #8d9c2c;
+            stroke-width: 2.5;
+            left: auto !important;
         }
         
         .yith-plugin-fw-onoff_icon--off {
-            right: 6px;
             opacity: 1;
+            width: 9px;
+            height: 9px;
+            stroke: currentColor;
+            stroke-width: 3;
+            color: #94a3b8;
         }
         
         .on_off:checked + .yith-plugin-fw-onoff .yith-plugin-fw-onoff_icon--on {
@@ -152,11 +164,10 @@ class MWM_VisualTeams_Admin {
                             mwmField += '<div class="yith-plugin-fw-onoff-container">';
                             mwmField += '<input type="checkbox" name="calculate_on_total" value="yes" class="on_off" />';
                             mwmField += '<span class="yith-plugin-fw-onoff">';
-                            mwmField += '<span class="yith-plugin-fw-onoff_handle" event="flex">';
-                            mwmField += '<svg class="yith-plugin-fw-onoff_icon yith-plugin-fw-onoff_icon--on" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" role="img"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>';
+                            mwmField += '<span class="yith-plugin-fw-onoff_handle">';
+                            mwmField += '<svg class="yith-plugin-fw-onoff_icon yith-plugin-fw-onoff_icon--on" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="#8d9c2c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" role="img"><path d="M6 10l3 3 5-5"/></svg>';
                             mwmField += '<svg class="yith-plugin-fw-onoff_icon yith-plugin-fw-onoff_icon--off" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" role="img"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
                             mwmField += '</span>';
-                            mwmField += '<span class="yith-plugin-fw-onoff_zero-width-space notranslate" event="flex"></span>';
                             mwmField += '</span>';
                             mwmField += '</div>';
                             mwmField += '</div>';
