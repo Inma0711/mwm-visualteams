@@ -92,6 +92,37 @@ var MWMVisualTeams = {
      * Prevent YITH WAPO from causing page redirects
      */
     preventYithRedirects: function() {
+        var self = this;
+        
+        // Check if total calculation is enabled before preventing redirects
+        $.ajax({
+            url: mwm_visualteams.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'mwm_check_total_calculation',
+                nonce: mwm_visualteams.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data.enabled) {
+                    console.log('✅ Botón activado - Previniendo redirecciones de YITH WAPO');
+                    self.setupRedirectPrevention();
+                } else {
+                    console.log('❌ Botón desactivado - No se previenen redirecciones, YITH WAPO funciona normalmente');
+                    // NO prevenir redirecciones - dejar que YITH WAPO funcione normalmente
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error checking total calculation:', error);
+                console.log('❌ Error al verificar - No se previenen redirecciones, YITH WAPO funciona normalmente');
+                // NO prevenir redirecciones - dejar que YITH WAPO funcione normalmente
+            }
+        });
+    },
+    
+    /**
+     * Setup redirect prevention (only called when button is enabled)
+     */
+    setupRedirectPrevention: function() {
         // Prevent form submissions
         $(document).off('submit.mwm-yith-prevent').on('submit.mwm-yith-prevent', 'form', function(e) {
             var $form = $(this);
@@ -357,19 +388,22 @@ var MWMVisualTeams = {
                         console.log('✅ Applying 70% calculation');
                         self.applySeventyPercentCalculation(selectedOptions, basePrice);
                     } else {
-                        console.log('❌ Applying normal calculation');
-                        self.applyNormalCalculation(selectedOptions, basePrice);
+                        console.log('❌ Botón desactivado - No se aplica ningún cambio, YITH WAPO maneja los precios normalmente');
+                        // NO hacer nada - dejar que YITH WAPO maneje los precios normalmente
+                        return;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('AJAX error checking total calculation:', error);
-                    console.log('Fallback to normal calculation');
-                    self.applyNormalCalculation(selectedOptions, basePrice);
+                    console.log('❌ Error al verificar - No se aplica ningún cambio, YITH WAPO maneja los precios normalmente');
+                    // NO hacer nada - dejar que YITH WAPO maneje los precios normalmente
+                    return;
                 }
             });
         } else {
-            console.log('No selected options, resetting to base price');
-            self.updatePriceDisplay(basePrice, 0, basePrice);
+            console.log('No selected options, no action needed');
+            // NO hacer nada - dejar que YITH WAPO maneje los precios normalmente
+            return;
         }
         
         console.log('=== End YITH Option Change ===');
