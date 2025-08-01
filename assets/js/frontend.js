@@ -291,15 +291,13 @@ var MWMVisualTeams = {
                 console.log('Extracted price:', optionPrice, 'for option:', optionName);
             }
             
-            // Check if this is Cromato or Olografico
-            if (optionName.toLowerCase().includes('cromato') || optionName.toLowerCase().includes('olografico')) {
-                selectedOptions.push({
-                    name: optionName,
-                    originalPrice: optionPrice,
-                    element: $option
-                });
-                console.log('✅ Added Cromato/Olografico option:', optionName, 'with price:', optionPrice);
-            }
+            // Ahora capturamos TODAS las opciones seleccionadas, no solo Cromato/Olografico
+            selectedOptions.push({
+                name: optionName,
+                originalPrice: optionPrice,
+                element: $option
+            });
+            console.log('✅ Added option:', optionName, 'with price:', optionPrice);
         });
         
         // Method 2: Check specifically for YITH WAPO options
@@ -320,15 +318,13 @@ var MWMVisualTeams = {
                     console.log('Extracted price:', optionPrice, 'for option:', optionName);
                 }
                 
-                // Check if this is Cromato or Olografico
-                if (optionName.toLowerCase().includes('cromato') || optionName.toLowerCase().includes('olografico')) {
-                    selectedOptions.push({
-                        name: optionName,
-                        originalPrice: optionPrice,
-                        element: $option
-                    });
-                    console.log('✅ Added Cromato/Olografico option:', optionName, 'with price:', optionPrice);
-                }
+                // Ahora capturamos TODAS las opciones seleccionadas
+                selectedOptions.push({
+                    name: optionName,
+                    originalPrice: optionPrice,
+                    element: $option
+                });
+                console.log('✅ Added option:', optionName, 'with price:', optionPrice);
             });
         }
         
@@ -355,15 +351,13 @@ var MWMVisualTeams = {
                             console.log('Extracted price:', optionPrice, 'for option:', optionName);
                         }
                         
-                        // Check if this is Cromato or Olografico
-                        if (optionName.toLowerCase().includes('cromato') || optionName.toLowerCase().includes('olografico')) {
-                            selectedOptions.push({
-                                name: optionName,
-                                originalPrice: optionPrice,
-                                element: $option
-                            });
-                            console.log('✅ Added Cromato/Olografico option:', optionName, 'with price:', optionPrice);
-                        }
+                        // Ahora capturamos TODAS las opciones seleccionadas
+                        selectedOptions.push({
+                            name: optionName,
+                            originalPrice: optionPrice,
+                            element: $option
+                        });
+                        console.log('✅ Added option:', optionName, 'with price:', optionPrice);
                     });
                 }
             });
@@ -372,9 +366,13 @@ var MWMVisualTeams = {
         console.log('Selected options count:', selectedOptions.length);
         console.log('Selected options:', selectedOptions);
         
-        // If we have selected options, check if total calculation is enabled
-        if (selectedOptions.length > 0) {
-            console.log('Checking if total calculation is enabled...');
+        // Check if we have at least one main option (Cromato/Olografico)
+        var hasMainOption = selectedOptions.some(function(option) {
+            return option.name.toLowerCase().includes('cromato') || option.name.toLowerCase().includes('olografico');
+        });
+        
+        if (hasMainOption) {
+            console.log('Found main option (Cromato/Olografico), checking if total calculation is enabled...');
             $.ajax({
                 url: mwm_visualteams.ajax_url,
                 type: 'POST',
@@ -401,7 +399,7 @@ var MWMVisualTeams = {
                 }
             });
         } else {
-            console.log('No selected options, no action needed');
+            console.log('No main options (Cromato/Olografico) found, no action needed');
             // NO hacer nada - dejar que YITH WAPO maneje los precios normalmente
             return;
         }
@@ -414,32 +412,75 @@ var MWMVisualTeams = {
      */
     applySeventyPercentCalculation: function(selectedOptions, basePrice) {
         console.log('Applying 70% calculation with base price:', basePrice);
-        var totalOptionsPrice = 0;
-        var step1Result = 0; // Para almacenar el resultado del paso 1
+        
+        // Separar opciones principales (Cromato/Olografico) de opciones adicionales
+        var mainOptions = [];
+        var additionalOptions = [];
         
         selectedOptions.forEach(function(option) {
-            console.log('Processing option:', option.name, 'with original price:', option.originalPrice);
-            
-            // Apply 70% calculation formula
-            var step1 = basePrice - option.originalPrice; // Restar opción del precio base
-            var step2 = step1 * 0.70; // 70% del resultado
-            var newOptionPrice = step2; // Nuevo precio de la opción
-            
-            console.log('Step 1 (base - option):', basePrice, '-', option.originalPrice, '=', step1);
-            console.log('Step 2 (70% of result):', step1, '* 0.70 =', step2);
-            console.log('New option price:', newOptionPrice);
-            
-            totalOptionsPrice += newOptionPrice;
-            step1Result = step1; // Guardamos el resultado del paso 1
+            if (option.name.toLowerCase().includes('cromato') || option.name.toLowerCase().includes('olografico')) {
+                mainOptions.push(option);
+            } else {
+                additionalOptions.push(option);
+            }
         });
         
-        // CORRECCIÓN: El total final debe ser: (base - option) + (70% del resultado)
-        // Es decir: step1Result + totalOptionsPrice
-        var finalTotalPrice = step1Result + totalOptionsPrice;
+        console.log('Main options (Cromato/Olografico):', mainOptions);
+        console.log('Additional options:', additionalOptions);
         
-        console.log('Final calculation - Base:', basePrice, 'Step1 result:', step1Result, 'Options (70%):', totalOptionsPrice, 'Final Total:', finalTotalPrice);
-        console.log('Formula: (', basePrice, '- option) + (70% of result) =', step1Result, '+', totalOptionsPrice, '=', finalTotalPrice);
-        this.updatePriceDisplay(basePrice, totalOptionsPrice, finalTotalPrice);
+        // Si no hay opciones principales, no aplicar cálculo
+        if (mainOptions.length === 0) {
+            console.log('No main options found, applying normal calculation');
+            this.applyNormalCalculation(selectedOptions, basePrice);
+            return;
+        }
+        
+        // Tomar solo la primera opción principal (según la lógica original)
+        var mainOption = mainOptions[0];
+        console.log('Processing main option:', mainOption.name, 'with price:', mainOption.originalPrice);
+        
+        // Calcular suma de todas las opciones adicionales
+        var additionalOptionsTotal = 0;
+        additionalOptions.forEach(function(option) {
+            additionalOptionsTotal += option.originalPrice;
+            console.log('Adding additional option:', option.name, 'with price:', option.originalPrice);
+        });
+        
+        // VERIFICAR SI HAY OPCIONES ADICIONALES
+        if (additionalOptionsTotal > 0) {
+            // NUEVA FÓRMULA CON OPCIONES ADICIONALES:
+            // Paso 1: Sumar todo (base + opción principal + opciones adicionales)
+            var step1_total = basePrice + mainOption.originalPrice + additionalOptionsTotal;
+            console.log('Step 1 (sum all):', basePrice, '+', mainOption.originalPrice, '+', additionalOptionsTotal, '=', step1_total);
+            
+            // Paso 2: Quitar la opción principal para aplicar el %
+            var step2_without_main = step1_total - mainOption.originalPrice;
+            console.log('Step 2 (remove main option):', step1_total, '-', mainOption.originalPrice, '=', step2_without_main);
+            
+            // Paso 3: Calcular el 70% del resultado
+            var step3_percentage = step2_without_main * 0.70;
+            console.log('Step 3 (70% of result):', step2_without_main, '* 0.70 =', step3_percentage);
+            
+            // Paso 4: Sumar las opciones adicionales
+            var finalTotal = step3_percentage + additionalOptionsTotal;
+            console.log('Step 4 (add additional options):', step3_percentage, '+', additionalOptionsTotal, '=', finalTotal);
+        } else {
+            // FÓRMULA ORIGINAL SIN OPCIONES ADICIONALES:
+            // Paso 1: Restar la opción principal del precio base
+            var step1_result = basePrice - mainOption.originalPrice;
+            console.log('Step 1 (base - main option):', basePrice, '-', mainOption.originalPrice, '=', step1_result);
+            
+            // Paso 2: Calcular el 70% del resultado
+            var step2_percentage = step1_result * 0.70;
+            console.log('Step 2 (70% of result):', step1_result, '* 0.70 =', step2_percentage);
+            
+            // Paso 3: Sumar el resultado del paso 1 + el 70%
+            var finalTotal = step1_result + step2_percentage;
+            console.log('Step 3 (final total):', step1_result, '+', step2_percentage, '=', finalTotal);
+        }
+        
+        console.log('Final calculation result:', finalTotal);
+        this.updatePriceDisplay(basePrice, finalTotal, finalTotal);
     },
     
     /**
