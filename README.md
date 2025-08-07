@@ -12,6 +12,12 @@ Extensión para YITH WooCommerce Product Add-ons que permite calcular opciones s
 ### 🔄 Funcionalidad: Cálculo 70% Automático
 - **Activación**: Solo se aplica cuando el botón "Calcular sobre precio total del producto" está activado en el panel de WordPress
 - **Opciones Aplicables**: Cromato y Olografico en la sección SUPPORTI SPECIALI
+- **Nueva Lógica (v1.1)**: 
+  - **Solo Cromato seleccionado** → Cálculo normal (sin 70%)
+  - **Solo Olográfico seleccionado** → Cálculo normal (sin 70%)
+  - **Cromato + otros addons** → Aplicar 70%
+  - **Olográfico + otros addons** → Aplicar 70%
+  - **Cromato + Olográfico** → Aplicar 70% (ambos son Cromato/Olográfico)
 - **Fórmula Aplicada**: 
   1. Se resta el precio de la opción del total del producto
   2. Se calcula el 70% del precio base resultante
