@@ -1,21 +1,26 @@
 /**
- * Frontend JavaScript for MWM Visual Teams
+ * Frontend JavaScript for MWM Visual Teams - SIMPLIFIED
  */
 
 var MWMVisualTeams = {
     
     init: function() {
+        console.log('MWM Plugin: Initializing...');
         this.bindEvents();
     },
     
     bindEvents: function() {
         var self = this;
         
+        console.log('=== MWM PLUGIN: bindEvents() called ===');
+        console.log('Available mwm_visualteams object:', typeof mwm_visualteams);
+        
         // Prevent YITH WAPO from causing page redirects
         this.preventYithRedirects();
         
         // Listen for YITH add-on changes
         $(document).on('change', '.yith-wapo-option', function(e) {
+            console.log('=== MWM PLUGIN: YITH add-on change detected ===');
             // Prevent default behavior that might cause redirect
             e.preventDefault();
             e.stopPropagation();
@@ -61,6 +66,26 @@ var MWMVisualTeams = {
             setTimeout(function() {
                 self.handleYithOptionChange();
             }, 100);
+        });
+        
+        // Listen for MODELLO CAN AM UTV selector changes
+        $(document).on('change', 'select, input', function() {
+            var $element = $(this);
+            var $label = $element.closest('label, .form-group, .field-group').find('label, strong, b').first();
+            var labelText = $label.text().trim().toUpperCase();
+            
+            console.log('=== MWM PLUGIN: Any select/input change detected ===');
+            console.log('Element:', $element[0]);
+            console.log('Label text:', labelText);
+            console.log('Value:', $element.val());
+            
+            if (labelText.includes('MODELLO') && labelText.includes('CAN AM') && labelText.includes('UTV')) {
+                console.log('=== MWM PLUGIN: MODELLO CAN AM UTV changed ===');
+                console.log('MODELLO CAN AM UTV changed:', $element.val());
+                setTimeout(function() {
+                    self.handleYithOptionChange();
+                }, 100);
+            }
         });
         
         // Also listen for any changes in the SUPPORTI SPECIALI section
@@ -222,6 +247,45 @@ var MWMVisualTeams = {
     handleYithOptionChange: function() {
         var self = this;
         
+        // Log all form elements for debugging
+        console.log('=== MWM DEBUG: Form Elements Detection ===');
+        console.log('All inputs on page:', $('input').length);
+        console.log('All selects on page:', $('select').length);
+        console.log('All labels on page:', $('label').length);
+        
+        // Log all select elements specifically
+        $('select').each(function(index) {
+            var $select = $(this);
+            var selectName = $select.attr('name') || 'no-name';
+            var selectId = $select.attr('id') || 'no-id';
+            var selectValue = $select.val() || 'no-value';
+            var selectText = $select.find('option:selected').text() || 'no-text';
+            console.log('Select ' + index + ':', {
+                name: selectName,
+                id: selectId,
+                value: selectValue,
+                text: selectText,
+                element: $select[0]
+            });
+        });
+        
+        // Log all input elements
+        $('input[type="radio"], input[type="checkbox"]').each(function(index) {
+            var $input = $(this);
+            var inputName = $input.attr('name') || 'no-name';
+            var inputValue = $input.val() || 'no-value';
+            var isChecked = $input.is(':checked');
+            var $label = $input.closest('label');
+            var labelText = $label.text().trim() || 'no-label';
+            console.log('Input ' + index + ':', {
+                name: inputName,
+                value: inputValue,
+                checked: isChecked,
+                label: labelText,
+                element: $input[0]
+            });
+        });
+        
         // Try multiple sources for base price
         var basePrice = window.mwmBasePrice || 0;
         
@@ -243,6 +307,45 @@ var MWMVisualTeams = {
         
         // Get selected YITH options - try multiple selectors
         var selectedOptions = [];
+        
+        // Special detection for MODELLO CAN AM UTV selector
+        console.log('=== MWM DEBUG: Looking for MODELLO CAN AM UTV ===');
+        $('select, input').each(function() {
+            var $element = $(this);
+            var $label = $element.closest('label, .form-group, .field-group').find('label, strong, b').first();
+            var labelText = $label.text().trim().toUpperCase();
+            
+            if (labelText.includes('MODELLO') && labelText.includes('CAN AM') && labelText.includes('UTV')) {
+                var selectedValue = $element.val();
+                var selectedText = $element.find('option:selected').text() || selectedValue;
+                
+                console.log('FOUND MODELLO CAN AM UTV selector:', {
+                    element: $element[0],
+                    label: labelText,
+                    value: selectedValue,
+                    text: selectedText,
+                    type: $element.prop('tagName').toLowerCase()
+                });
+                
+                // Extract price from selected option text (e.g., "MAVERICK 1° GEN. (+115,00 €)")
+                var priceMatch = selectedText.match(/\([+]?([0-9,]+\.?[0-9]*)\s*€\)/);
+                var modelloPrice = 0;
+                if (priceMatch) {
+                    modelloPrice = parseFloat(priceMatch[1].replace(',', '.'));
+                    console.log('MODELLO price extracted:', modelloPrice);
+                }
+                
+                // Add this as a special required option with its price
+                selectedOptions.push({
+                    name: 'MODELLO CAN AM UTV',
+                    originalPrice: modelloPrice, // Include the actual price
+                    element: $element,
+                    isRequired: true,
+                    value: selectedValue,
+                    isModello: true // Mark this as MODELLO option
+                });
+            }
+        });
         
         // Method 1: Check for checked radio buttons and checkboxes
         $('input[type="radio"]:checked, input[type="checkbox"]:checked').each(function() {
@@ -332,7 +435,23 @@ var MWMVisualTeams = {
             return option.name.toLowerCase().includes('cromato') || option.name.toLowerCase().includes('olografico');
         });
         
+        // Check if MODELLO CAN AM UTV is selected (required) - but don't block if not found
+        var hasModelloSelected = selectedOptions.some(function(option) {
+            return option.isRequired && option.value && option.value !== 'no-value' && option.value !== '';
+        });
+        
+        console.log('=== MWM DEBUG: Validation ===');
+        console.log('Has main option (Cromato/Olografico):', hasMainOption);
+        console.log('Has MODELLO CAN AM UTV selected:', hasModelloSelected);
+        console.log('Selected options count:', selectedOptions.length);
+        
+        // Apply calculation if we have main option (with or without MODELLO)
         if (hasMainOption) {
+            // Show warning if MODELLO not detected but don't block
+            if (!hasModelloSelected) {
+                console.warn('MWM WARNING: MODELLO CAN AM UTV selector not detected or not selected');
+            }
+            
             $.ajax({
                 url: mwm_visualteams.ajax_url,
                 type: 'POST',
@@ -363,17 +482,26 @@ var MWMVisualTeams = {
      * Apply 70% calculation to selected options
      */
     applySeventyPercentCalculation: function(selectedOptions, basePrice) {
-        // Separar Cromato/Olográfico de otras opciones
+        // Separar Cromato/Olográfico de otras opciones, excluyendo MODELLO
         var cromatoOlograficoOptions = [];
         var otherOptions = [];
+        var modelloOptions = [];
         
         selectedOptions.forEach(function(option) {
-            if (option.name.toLowerCase().includes('cromato') || option.name.toLowerCase().includes('olografico')) {
+            if (option.isModello) {
+                // MODELLO CAN AM UTV se trata por separado
+                modelloOptions.push(option);
+            } else if (option.name.toLowerCase().includes('cromato') || option.name.toLowerCase().includes('olografico')) {
                 cromatoOlograficoOptions.push(option);
             } else {
                 otherOptions.push(option);
             }
         });
+        
+        console.log('=== MWM DEBUG: Options Classification ===');
+        console.log('Cromato/Olografico options:', cromatoOlograficoOptions.length);
+        console.log('Other options:', otherOptions.length);
+        console.log('Modello options:', modelloOptions.length);
         
         // Si no hay Cromato/Olográfico, aplicar cálculo normal
         if (cromatoOlograficoOptions.length === 0) {
@@ -394,7 +522,7 @@ var MWMVisualTeams = {
         }
         
         // Si hay Cromato/Olográfico + otras opciones, aplicar 70%
-        // Paso 1: Sumar todo (base + Cromato/Olográfico + otras opciones)
+        // Paso 1: Sumar todo (base + Cromato/Olográfico + otras opciones) - SIN MODELLO
         var step1_total = basePrice;
         cromatoOlograficoOptions.forEach(function(option) {
             step1_total += option.originalPrice;
@@ -420,8 +548,22 @@ var MWMVisualTeams = {
         });
         var finalTotal = step3_percentage + otherOptionsTotal;
         
-        // Actualizar la interfaz
-        this.updatePriceDisplay(basePrice, finalTotal, basePrice + finalTotal);
+        // Paso 5: Añadir MODELLO CAN AM UTV al final (sin afectar el 70%)
+        var modelloTotal = 0;
+        modelloOptions.forEach(function(option) {
+            modelloTotal += option.originalPrice;
+        });
+        
+        console.log('=== MWM DEBUG: Calculation Steps ===');
+        console.log('Step 1 (base + cromato + others):', step1_total);
+        console.log('Step 2 (without cromato):', step2_without_cromato);
+        console.log('Step 3 (70%):', step3_percentage);
+        console.log('Step 4 (final without modello):', finalTotal);
+        console.log('Modello total:', modelloTotal);
+        console.log('Final total with modello:', finalTotal + modelloTotal);
+        
+        // Actualizar la interfaz - mostrar solo el total de opciones (sin base)
+        this.updatePriceDisplay(basePrice, finalTotal + modelloTotal, basePrice + finalTotal + modelloTotal);
     },
     
     /**
@@ -433,6 +575,11 @@ var MWMVisualTeams = {
         selectedOptions.forEach(function(option) {
             totalOptionsPrice += option.originalPrice;
         });
+        
+        console.log('=== MWM DEBUG: Normal Calculation ===');
+        console.log('Base price:', basePrice);
+        console.log('Options total:', totalOptionsPrice);
+        console.log('Final total:', basePrice + totalOptionsPrice);
         
         var newTotalPrice = basePrice + totalOptionsPrice;
         this.updatePriceDisplay(basePrice, totalOptionsPrice, newTotalPrice);
@@ -647,5 +794,11 @@ var MWMVisualTeams = {
 
 // Initialize when document is ready
 jQuery(document).ready(function($) {
+    console.log('=== MWM PLUGIN: Starting initialization ===');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('MWMVisualTeams object:', typeof MWMVisualTeams);
+    
     MWMVisualTeams.init();
+    
+    console.log('=== MWM PLUGIN: Initialization complete ===');
 }); 

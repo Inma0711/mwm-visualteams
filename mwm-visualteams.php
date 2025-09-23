@@ -57,7 +57,7 @@ class MWM_VisualTeams_Plugin {
         }
         
         // Check if YITH WooCommerce Product Add-ons is active
-        if (!class_exists('YITH_WAPO')) {
+        if (!is_plugin_active('yith-woocommerce-product-add-ons/init.php')) {
             add_action('admin_notices', array($this, 'yith_addons_missing_notice'));
         }
     }
@@ -130,6 +130,8 @@ class MWM_VisualTeams_Plugin {
      */
     public function footer_test() {
         echo '<!-- MWM Visual Teams Plugin Loaded at: ' . current_time('H:i:s') . ' -->';
+        echo '<script>console.log("MWM DEBUG: Plugin loaded at ' . current_time('H:i:s') . '");</script>';
+        echo '<div style="position: fixed; bottom: 0; right: 0; background: blue; color: white; padding: 5px; z-index: 9999;">MWM Plugin Active</div>';
     }
     
     /**
@@ -158,7 +160,7 @@ class MWM_VisualTeams_Plugin {
     public function frontend_scripts() {
         wp_enqueue_script(
             'mwm-visualteams-frontend',
-            MWM_VISUALTEAMS_PLUGIN_URL . 'assets/js/frontend.js',
+            MWM_VISUALTEAMS_PLUGIN_URL . 'assets/js/frontend-simple.js',
             array('jquery'),
             MWM_VISUALTEAMS_VERSION,
             true

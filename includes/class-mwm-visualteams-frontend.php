@@ -17,12 +17,18 @@ class MWM_VisualTeams_Frontend {
         // Frontend hooks
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         
+        // Test hook that runs on ALL pages
+        add_action('wp_footer', array($this, 'test_all_pages'));
+        
         // Only hook into WooCommerce if it's active
         if (class_exists('WooCommerce')) {
             add_action('woocommerce_after_add_to_cart_button', array($this, 'add_frontend_scripts'));
             
             // Add provisional checkboxes for 70% calculation
             add_action('woocommerce_after_single_product_summary', array($this, 'add_provisional_checkboxes'), 15);
+            
+            // Test hook that always executes
+            add_action('wp_footer', array($this, 'test_hook'));
             
             // Add AJAX handlers
             add_action('wp_ajax_mwm_calculate_seventy_percent', array($this, 'calculate_seventy_percent'));
@@ -36,10 +42,10 @@ class MWM_VisualTeams_Frontend {
      * Enqueue frontend scripts
      */
     public function enqueue_scripts() {
-        // Always load basic scripts
+        // Load simplified JavaScript
         wp_enqueue_script(
             'mwm-visualteams-frontend',
-            MWM_VISUALTEAMS_PLUGIN_URL . 'assets/js/frontend.js',
+            MWM_VISUALTEAMS_PLUGIN_URL . 'assets/js/frontend-simple.js',
             array('jquery'),
             MWM_VISUALTEAMS_VERSION,
             true
@@ -47,7 +53,7 @@ class MWM_VisualTeams_Frontend {
         
         // Only load WooCommerce specific data if WooCommerce is active
         if (class_exists('WooCommerce') && is_product()) {
-            wp_localize_script('mwm-visualteams-frontend', 'mwm_visualteams', array(
+            wp_localize_script('mwm-visualteams-frontend', 'mwm_ajax', array(
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('mwm_visualteams_nonce'),
                 'currency_symbol' => get_woocommerce_currency_symbol(),
@@ -68,6 +74,9 @@ class MWM_VisualTeams_Frontend {
             return;
         }
         
+        // Test: Add a simple message to see if this hook is working
+        echo '<div style="background: red; color: white; padding: 10px; margin: 10px 0;">TEST: MWM Visual Teams Frontend Hook Working!</div>';
+        
         $product_id = $product->get_id();
         $base_price = $product->get_price();
         
@@ -82,7 +91,13 @@ class MWM_VisualTeams_Frontend {
         
         ?>
         <div class="mwm-provisional-checkboxes" style="margin: 20px 0; padding: 15px; border: 2px solid #0073aa; background: #f9f9f9;">
-            <h3 style="margin-top: 0; color: #0073aa;">🔄 Cálculo Provisional 70%</h3>
+            <h3 style="margin-top: 0; color: #0073aa;">🔄 Debug: Cálculo 70% (PHP)</h3>
+            
+            <!-- Simple Status -->
+            <div id="mwm-plugin-status" style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                <p style="margin: 0; color: #155724;"><strong>✅ Plugin MWM Visual Teams activo</strong></p>
+                <p style="margin: 5px 0 0 0; color: #155724; font-size: 12px;">El cálculo del 70% se maneja en PHP (servidor)</p>
+            </div>
             
             <!-- Status Message -->
             <div style="margin-bottom: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center;">
@@ -237,24 +252,10 @@ class MWM_VisualTeams_Frontend {
         
         <script type="text/javascript">
         jQuery(document).ready(function($) {
-            // Store base price for calculations
-            window.mwmBasePrice = <?php echo $base_price; ?>;
-            
-            // Handle checkbox changes for all dynamic options
-            $('input[name^="mwm_option_"]').on('change', function() {
-                // Uncheck other options if this one is checked
-                if ($(this).is(':checked')) {
-                    $('input[name^="mwm_option_"]').not(this).prop('checked', false);
-                }
-                
-                // Calculate new price
-                MWMVisualTeams.calculateSeventyPercent();
+            // Simple form change detection
+            $('select, input').on('change', function() {
+                // The calculation happens in PHP when the form is submitted
             });
-            
-            // Try to detect YITH options from the page and create dynamic checkboxes
-            setTimeout(function() {
-                MWMVisualTeams.detectYithOptions();
-            }, 1000);
         });
         </script>
         <?php
@@ -314,14 +315,37 @@ class MWM_VisualTeams_Frontend {
     }
     
     /**
+     * Test hook to verify plugin is working
+     */
+    public function test_hook() {
+        if (is_product()) {
+            echo '<div style="position: fixed; top: 0; left: 0; background: red; color: white; padding: 10px; z-index: 9999;">TEST: MWM Plugin Working!</div>';
+        }
+    }
+    
+    /**
+     * Test hook that runs on ALL pages
+     */
+    public function test_all_pages() {
+        echo '<!-- MWM Plugin Test: ' . current_time('H:i:s') . ' -->';
+    }
+    
+    /**
      * Add frontend scripts to product page
      */
     public function add_frontend_scripts() {
         ?>
         <script type="text/javascript">
+        console.log('MWM DEBUG: add_frontend_scripts called');
         jQuery(document).ready(function($) {
+            console.log('MWM DEBUG: jQuery ready in add_frontend_scripts');
             // Initialize total price calculation
-            MWMVisualTeams.init();
+            if (typeof MWMVisualTeams !== 'undefined') {
+                console.log('MWM DEBUG: MWMVisualTeams found, calling init');
+                MWMVisualTeams.init();
+            } else {
+                console.log('MWM DEBUG: MWMVisualTeams NOT found');
+            }
         });
         </script>
         <?php
@@ -376,14 +400,42 @@ class MWM_VisualTeams_Frontend {
                     $group_table = $wpdb->prefix . 'yith_wapo_groups';
                     
                     if ($wpdb->get_var("SHOW TABLES LIKE '$addon_table'") == $addon_table) {
-                        // Try to get addons that apply to this product or all products
-                        $addons = $wpdb->get_results($wpdb->prepare(
-                            "SELECT a.*, g.name as group_name 
-                             FROM $addon_table a 
-                             LEFT JOIN $group_table g ON a.group_id = g.id 
-                             WHERE a.product_id = %d OR a.product_id = 0 OR a.product_id IS NULL",
-                            $product_id
-                        ));
+                        // Check if groups table exists first
+                        $group_table_exists = $wpdb->get_var("SHOW TABLES LIKE '$group_table'") == $group_table;
+                        
+                        if ($group_table_exists) {
+                            // Try to get addons that apply to this product or all products
+                            $addons = $wpdb->get_results($wpdb->prepare(
+                                "SELECT a.*, g.name as group_name 
+                                 FROM $addon_table a 
+                                 LEFT JOIN $group_table g ON a.group_id = g.id 
+                                 WHERE a.product_id = %d OR a.product_id = 0 OR a.product_id IS NULL",
+                                $product_id
+                            ));
+                        } else {
+                            // If groups table doesn't exist, just get addons without group info
+                            // Check what columns exist in the addon table first
+                            $columns = $wpdb->get_results("DESCRIBE $addon_table");
+                            $has_product_id = false;
+                            foreach ($columns as $column) {
+                                if ($column->Field === 'product_id') {
+                                    $has_product_id = true;
+                                    break;
+                                }
+                            }
+                            
+                            if ($has_product_id) {
+                                $addons = $wpdb->get_results($wpdb->prepare(
+                                    "SELECT a.*, '' as group_name 
+                                     FROM $addon_table a 
+                                     WHERE a.product_id = %d OR a.product_id = 0 OR a.product_id IS NULL",
+                                    $product_id
+                                ));
+                            } else {
+                                // If no product_id column, get all addons
+                                $addons = $wpdb->get_results("SELECT a.*, '' as group_name FROM $addon_table a");
+                            }
+                        }
                         
                         foreach ($addons as $addon) {
                             $addon_options = maybe_unserialize($addon->options);
