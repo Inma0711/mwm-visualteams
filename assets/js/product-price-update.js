@@ -1,21 +1,12 @@
 jQuery(document).ready(function($) {
-    console.log('MWM Product Price Update: Script loaded');
-    
     // Check if mwmProductData is available
     if (typeof mwmProductData === 'undefined') {
-        console.log('MWM: mwmProductData not available');
         return;
     }
-    
-    console.log('MWM: Product data available:', mwmProductData);
-    console.log('MWM: Product ID:', mwmProductData.product_id);
-    console.log('MWM: Base price:', mwmProductData.product_base_price);
     
     // Function to collect selected addons
     function collectSelectedAddons() {
         var selectedAddons = [];
-        
-        console.log('MWM: Collecting selected addons...');
         
         // Find all YITH WAPO addon inputs by name attribute
         $('input[name*="yith_wapo"], select[name*="yith_wapo"]').each(function() {
@@ -25,15 +16,11 @@ jQuery(document).ready(function($) {
             var isChecked = $input.is(':checked');
             var isSelect = $input.is('select');
             
-            console.log('MWM: Found input:', name, 'value:', value, 'checked:', isChecked, 'isSelect:', isSelect);
-            
             // For selects, check if the selected option has a price
             if (isSelect) {
                 var $selectedOption = $input.find('option:selected');
                 var hasPrice = $selectedOption.data('price') && parseFloat($selectedOption.data('price')) > 0;
                 var priceMethod = $selectedOption.data('price-method');
-                
-                console.log('MWM: Select option data - price:', $selectedOption.data('price'), 'method:', priceMethod, 'hasPrice:', hasPrice);
                 
                 // Only process if it has a meaningful value and price
                 if (value && value !== '' && value !== 'default' && hasPrice && priceMethod !== 'free') {
@@ -48,8 +35,6 @@ jQuery(document).ready(function($) {
                             option_id: optionId,
                             value: value
                         });
-                        
-                        console.log('MWM: Added select addon:', addonId, '-', optionId, '=', value);
                     }
                 }
             } else {
@@ -66,20 +51,16 @@ jQuery(document).ready(function($) {
                             option_id: optionId,
                             value: value
                         });
-                        
-                        console.log('MWM: Added input addon:', addonId, '-', optionId, '=', value);
                     }
                 }
             }
         });
         
-        console.log('MWM: Total selected addons:', selectedAddons.length);
         return selectedAddons;
     }
     
     // Function to update price display
     function updatePriceDisplay(data) {
-        console.log('MWM: Updating price display with data:', data);
         
         // Update individual addon prices
         updateAddonPrices(data);
@@ -105,7 +86,6 @@ jQuery(document).ready(function($) {
                     var newPrice = data.individual_addon_prices[addonId];
                     if (newPrice > 0) {
                         $priceElement.html(formatPrice(newPrice));
-                        console.log('MWM: Updated addon', addonId, 'price to:', newPrice);
                     }
                 }
             });
@@ -131,7 +111,6 @@ jQuery(document).ready(function($) {
                             var $label = $input.closest('.yith-wapo-option').find('.option-price .woocommerce-Price-amount');
                             if ($label.length > 0) {
                                 $label.html(formatPrice(newPrice));
-                                console.log('MWM: Updated label price for addon', addonId, 'to:', newPrice);
                             }
                         }
                     }
@@ -159,8 +138,6 @@ jQuery(document).ready(function($) {
         
         // Also update any other price displays that might exist
         $('.woocommerce-Price-amount .woocommerce-Price-amount').not('#wapo-total-product-price .woocommerce-Price-amount, #wapo-total-options-price .woocommerce-Price-amount, #wapo-total-order-price .woocommerce-Price-amount').html(formatPrice(data.final_total));
-        
-        console.log('MWM: Updated main product price to:', data.final_total);
     }
     
     
@@ -171,18 +148,14 @@ jQuery(document).ready(function($) {
     
     // Function to calculate prices via AJAX
     function calculatePrices() {
-        console.log('MWM: calculatePrices called');
-        
         // Check if we have the required data
         if (!mwmProductData || !mwmProductData.product_id) {
-            console.log('MWM: Product data not available');
             return;
         }
         
         var selectedAddons = collectSelectedAddons();
         
         if (selectedAddons.length === 0) {
-            console.log('MWM: No addons selected, resetting to base price');
             // Reset to base price if no addons selected
             updatePriceDisplay({
                 base_price: mwmProductData.product_base_price || 0,
@@ -198,8 +171,6 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        console.log('MWM: Making AJAX call with addons:', selectedAddons);
-        
         $.ajax({
             url: mwmProductData.ajax_url,
             type: 'POST',
@@ -210,15 +181,12 @@ jQuery(document).ready(function($) {
                 nonce: mwmProductData.nonce
             },
             success: function(response) {
-                console.log('MWM: AJAX success:', response);
                 if (response.success) {
                     updatePriceDisplay(response.data);
-                } else {
-                    console.log('MWM: Error calculating prices:', response.data);
                 }
             },
-            error: function(xhr, status, error) {
-                console.log('MWM: AJAX error:', error, xhr.responseText);
+            error: function() {
+                // Silent error handling
             }
         });
     }
@@ -237,13 +205,11 @@ jQuery(document).ready(function($) {
     
     // Bind events to addon inputs - more specific selectors
     $(document).on('change', 'input[name*="yith_wapo"], select[name*="yith_wapo"]', function() {
-        console.log('MWM: Addon selection changed on:', this);
         debouncedCalculatePrices();
     });
     
     // Also bind to click events for checkboxes and radio buttons
     $(document).on('click', 'input[type="checkbox"][name*="yith_wapo"], input[type="radio"][name*="yith_wapo"]', function() {
-        console.log('MWM: Addon clicked:', this);
         debouncedCalculatePrices();
     });
     

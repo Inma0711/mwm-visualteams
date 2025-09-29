@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MWM Visual Teams - Product Options Extension
  * Plugin URI: https://visualteams.com
- * Description: Extensión para YITH WooCommerce Product Add-ons que permite calcular opciones sobre el precio total del producto
+ * Description: Estensione per YITH WooCommerce Product Add-ons che consente di calcolare le opzioni sul prezzo totale del prodotto
  * Version: 1.0.0
  * Author: MWM Visual Teams
  * Author URI: https://visualteams.com
@@ -82,12 +82,6 @@ class MWM_VisualTeams_Plugin {
      * Initialize hooks
      */
     private function init_hooks() {
-        // Add basic test notice
-        add_action('admin_notices', array($this, 'basic_test_notice'));
-        
-        // Add test to all pages
-        add_action('wp_footer', array($this, 'footer_test'));
-        add_action('admin_footer', array($this, 'footer_test'));
         
         // Admin hooks
         add_action('admin_enqueue_scripts', array($this, 'admin_scripts'));
@@ -122,24 +116,7 @@ class MWM_VisualTeams_Plugin {
         }
     }
     
-    /**
-     * Basic test notice
-     */
-    public function basic_test_notice() {
-        echo '<div class="notice notice-success is-dismissible">';
-        echo '<p><strong>MWM Visual Teams:</strong> Plugin principal funcionando! ✅</p>';
-        echo '<p>Hora de carga: ' . current_time('H:i:s') . '</p>';
-        echo '</div>';
-    }
     
-    /**
-     * Footer test
-     */
-    public function footer_test() {
-        echo '<!-- MWM Visual Teams Plugin Loaded at: ' . current_time('H:i:s') . ' -->';
-        echo '<script>console.log("MWM DEBUG: Plugin loaded at ' . current_time('H:i:s') . '");</script>';
-        echo '<div style="position: fixed; bottom: 0; right: 0; background: blue; color: white; padding: 5px; z-index: 9999;">MWM Plugin Active</div>';
-    }
     
     /**
      * Admin scripts

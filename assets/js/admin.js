@@ -27,7 +27,7 @@ jQuery(document).ready(function($) {
         function showTotalCalculationInfo(fieldWrap) {
             if (fieldWrap.find('.total-calculation-info').length === 0) {
                 var info = $('<div class="total-calculation-info" style="margin-top: 10px; padding: 10px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; color: #0066cc;">' +
-                    '<strong>Información:</strong> Esta opción calculará el precio sobre el total del producto (excluyendo esta opción) en lugar del precio base.' +
+                    '<strong>Informazione:</strong> Questa opzione calcolerà il prezzo sul totale del prodotto (escludendo questa opzione) invece del prezzo base.' +
                     '</div>');
                 fieldWrap.append(info);
             }
@@ -54,7 +54,7 @@ jQuery(document).ready(function($) {
                 // Check if percentage is set
                 var percentageField = optionCostField.find('input[type="number"]');
                 if (percentageField.length > 0 && percentageField.val() === '') {
-                    alert('Para usar el cálculo sobre precio total, debes configurar un porcentaje en el campo "Costo opzione".');
+                    alert('Per utilizzare il calcolo sul prezzo totale, devi configurare una percentuale nel campo "Costo opzione".');
                     $(this).prop('checked', false);
                     return false;
                 }

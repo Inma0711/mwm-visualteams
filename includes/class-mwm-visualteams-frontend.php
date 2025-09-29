@@ -78,8 +78,6 @@ class MWM_VisualTeams_Frontend {
             return;
         }
         
-        // Test: Add a simple message to see if this hook is working
-        echo '<div style="background: red; color: white; padding: 10px; margin: 10px 0;">TEST: MWM Visual Teams Frontend Hook Working!</div>';
         
         $product_id = $product->get_id();
         $base_price = $product->get_price();
@@ -89,180 +87,6 @@ class MWM_VisualTeams_Frontend {
         
         // Check if total calculation is enabled for any option
         $has_total_calculation = $this->check_total_calculation_status();
-        
-        // Debug mode - show detected options
-        $debug_mode = isset($_GET['mwm_debug']) && $_GET['mwm_debug'] === '1';
-        
-        ?>
-        <div class="mwm-provisional-checkboxes" style="margin: 20px 0; padding: 15px; border: 2px solid #0073aa; background: #f9f9f9;">
-            <h3 style="margin-top: 0; color: #0073aa;">🔄 Debug: Cálculo 70% (PHP)</h3>
-            
-            <!-- Simple Status -->
-            <div id="mwm-plugin-status" style="background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                <p style="margin: 0; color: #155724;"><strong>✅ Plugin MWM Visual Teams activo</strong></p>
-                <p style="margin: 5px 0 0 0; color: #155724; font-size: 12px;">El cálculo del 70% se maneja en PHP (servidor)</p>
-            </div>
-            
-            <!-- Status Message -->
-            <div style="margin-bottom: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center;">
-                <?php if ($has_total_calculation): ?>
-                    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724;">
-                        ✅ BOTÓN ACTIVADO - "Calcular sobre el precio total del producto" está ACTIVO
-                    </div>
-                <?php else: ?>
-                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24;">
-                        ❌ BOTÓN DESACTIVADO - "Calcular sobre el precio total del producto" está INACTIVO
-                    </div>
-                <?php endif; ?>
-            </div>
-            
-            <p style="margin-bottom: 15px; font-style: italic;">Selecciona una opción para aplicar el cálculo del 70% sobre el precio base del producto:</p>
-            
-            <?php if ($debug_mode): ?>
-                <div style="background: #e7f3ff; border: 1px solid #0073aa; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                    <h4 style="margin-top: 0; color: #0073aa;">🔍 Debug Info:</h4>
-                    <p><strong>Product ID:</strong> <?php echo $product_id; ?></p>
-                    <p><strong>Base Price:</strong> <?php echo wc_price($base_price); ?></p>
-                    <p><strong>Options Found:</strong> <?php echo count($option_prices); ?></p>
-                    <p><strong>Total Calculation Enabled:</strong> <?php echo $has_total_calculation ? 'YES' : 'NO'; ?></p>
-                    
-                    <?php 
-                    // Show database info
-                    global $wpdb;
-                    $addon_table = $wpdb->prefix . 'yith_wapo_addons';
-                    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$addon_table'") == $addon_table;
-                    ?>
-                    <p><strong>YITH WAPO Table Exists:</strong> <?php echo $table_exists ? 'YES' : 'NO'; ?></p>
-                    
-                    <?php if ($table_exists): ?>
-                        <?php 
-                        $addons = $wpdb->get_results(
-                            "SELECT id, options FROM $addon_table WHERE options LIKE '%Cromato%' OR options LIKE '%Olografico%'"
-                        );
-                        ?>
-                        <p><strong>Addons with Cromato/Olografico:</strong> <?php echo count($addons); ?></p>
-                        
-                        <?php 
-                        // Get ALL addons for comparison
-                        $all_addons = $wpdb->get_results("SELECT id, options FROM $addon_table");
-                        ?>
-                        <p><strong>Total Addons in Database:</strong> <?php echo count($all_addons); ?></p>
-                        
-                        <?php if (!empty($addons)): ?>
-                            <ul>
-                                <?php foreach ($addons as $addon): ?>
-                                    <?php 
-                                    $addon_options = maybe_unserialize($addon->options);
-                                    $calculate_on_total = get_post_meta($addon->id, '_calculate_on_total', true);
-                                    ?>
-                                    <li>
-                                        <strong>Addon ID <?php echo $addon->id; ?>:</strong> 
-                                        _calculate_on_total = "<?php echo $calculate_on_total; ?>"
-                                        <?php if (is_array($addon_options)): ?>
-                                            <br>Options: 
-                                            <?php foreach ($addon_options as $option): ?>
-                                                <?php if (isset($option['label'])): ?>
-                                                    "<?php echo esc_html($option['label']); ?>" 
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                        
-                        <!-- Show ALL addons with _calculate_on_total = 'yes' -->
-                        <?php 
-                        $enabled_addons = array();
-                        foreach ($all_addons as $addon) {
-                            $calculate_on_total = get_post_meta($addon->id, '_calculate_on_total', true);
-                            if ($calculate_on_total === 'yes') {
-                                $enabled_addons[] = $addon;
-                            }
-                        }
-                        ?>
-                        <p><strong>All Addons with _calculate_on_total = "yes":</strong> <?php echo count($enabled_addons); ?></p>
-                        <?php if (!empty($enabled_addons)): ?>
-                            <ul>
-                                <?php foreach ($enabled_addons as $addon): ?>
-                                    <li><strong>Addon ID <?php echo $addon->id; ?>:</strong> _calculate_on_total = "yes"</li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                    
-                    <?php if (!empty($option_prices)): ?>
-                        <ul>
-                            <?php foreach ($option_prices as $option): ?>
-                                <li><?php echo esc_html($option['name']); ?> - <?php echo wc_price($option['price']); ?> (ID: <?php echo $option['id']; ?>)</li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php else: ?>
-                        <p style="color: #dc3545;">No se encontraron opciones</p>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($option_prices)): ?>
-                <?php foreach ($option_prices as $option): ?>
-                <div class="mwm-checkbox-group" style="margin-bottom: 10px;">
-                    <label style="display: block; margin-bottom: 5px;">
-                        <input type="checkbox" name="mwm_option_<?php echo esc_attr($option['id']); ?>" 
-                               value="<?php echo esc_attr($option['price']); ?>" 
-                               data-option-name="<?php echo esc_attr($option['name']); ?>" 
-                               style="margin-right: 8px;">
-                        <strong><?php echo esc_html($option['name']); ?> (+<?php echo wc_price($option['price']); ?>)</strong> - Aplicar 70%
-                    </label>
-                </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                    <p style="margin: 0; color: #856404;">⚠️ No se encontraron opciones de producto configuradas. Los checkboxes de prueba usarán precios por defecto.</p>
-                    <?php if (!$debug_mode): ?>
-                        <p style="margin: 5px 0 0 0; font-size: 12px;">
-                            <a href="?mwm_debug=1" style="color: #0073aa;">🔍 Activar modo debug para ver más información</a>
-                        </p>
-                    <?php endif; ?>
-                </div>
-                
-                <!-- Fallback checkboxes with default prices -->
-                <div class="mwm-checkbox-group" style="margin-bottom: 10px;">
-                    <label style="display: block; margin-bottom: 5px;">
-                        <input type="checkbox" name="mwm_option_cromato" value="115.50" data-option-name="Cromato" style="margin-right: 8px;">
-                        <strong>Cromato (+115,50 €)</strong> - Aplicar 70% (precio por defecto)
-                    </label>
-                </div>
-                
-                <div class="mwm-checkbox-group" style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px;">
-                        <input type="checkbox" name="mwm_option_olografico" value="115.50" data-option-name="Olografico" style="margin-right: 8px;">
-                        <strong>Olografico (+115,50 €)</strong> - Aplicar 70% (precio por defecto)
-                    </label>
-                </div>
-            <?php endif; ?>
-            
-            <div class="mwm-calculation-results" style="background: white; padding: 10px; border: 1px solid #ddd; margin-top: 10px;">
-                <h4 style="margin-top: 0; color: #333;">Resultados del Cálculo:</h4>
-                <div id="mwm-calculation-details" style="font-family: monospace; font-size: 12px;">
-                    Selecciona una opción para ver el cálculo...
-                </div>
-            </div>
-            
-            <div class="mwm-price-display" style="margin-top: 15px; padding: 10px; background: #e7f3ff; border-left: 4px solid #0073aa;">
-                <strong>Precio Base del Producto:</strong> <span id="mwm-base-price"><?php echo wc_price($base_price); ?></span><br>
-                <strong>Nuevo Precio Total:</strong> <span id="mwm-new-total-price" style="font-weight: bold; color: #0073aa;">-</span>
-            </div>
-        </div>
-        
-        <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            // Simple form change detection
-            $('select, input').on('change', function() {
-                // The calculation happens in PHP when the form is submitted
-            });
-        });
-        </script>
-        <?php
     }
     
     /**
@@ -279,13 +103,13 @@ class MWM_VisualTeams_Frontend {
         $option_name = sanitize_text_field($_POST['option_name']);
         
         // Calculate according to the CORRECT formula:
-        // 1. Restar el precio de la opción del precio base del producto
+        // 1. Sottrarre il prezzo dell'opzione dal prezzo base del prodotto
         $step1_result = $base_price - $option_price;
         
-        // 2. Calcular el 70% del resultado anterior
+        // 2. Calcolare il 70% del risultato precedente
         $step2_percentage = $step1_result * 0.70;
         
-        // 3. Calcular el nuevo total (precio base - opción + 70% del resultado)
+        // 3. Calcolare il nuovo totale (prezzo base - opzione + 70% del risultato)
         $step3_new_total = $step1_result + $step2_percentage;
         
         $response = array(
@@ -340,15 +164,10 @@ class MWM_VisualTeams_Frontend {
     public function add_frontend_scripts() {
         ?>
         <script type="text/javascript">
-        console.log('MWM DEBUG: add_frontend_scripts called');
         jQuery(document).ready(function($) {
-            console.log('MWM DEBUG: jQuery ready in add_frontend_scripts');
             // Initialize total price calculation
             if (typeof MWMVisualTeams !== 'undefined') {
-                console.log('MWM DEBUG: MWMVisualTeams found, calling init');
                 MWMVisualTeams.init();
-            } else {
-                console.log('MWM DEBUG: MWMVisualTeams NOT found');
             }
         });
         </script>
@@ -499,7 +318,7 @@ class MWM_VisualTeams_Frontend {
                         if (isset($option['price']) && !empty($option['price'])) {
                             $options[] = array(
                                 'id' => sanitize_title($option['name'] ?? $option['label'] ?? 'option'),
-                                'name' => $option['name'] ?? $option['label'] ?? 'Opción',
+                                'name' => $option['name'] ?? $option['label'] ?? 'Opzione',
                                 'price' => floatval($option['price'])
                             );
                         }
@@ -528,7 +347,7 @@ class MWM_VisualTeams_Frontend {
                     if (isset($option['price']) && !empty($option['price'])) {
                         $options[] = array(
                             'id' => $addon->id . '_' . sanitize_title($option['label'] ?? 'option'),
-                            'name' => $option['label'] ?? 'Opción',
+                            'name' => $option['label'] ?? 'Opzione',
                             'price' => floatval($option['price'])
                         );
                     }
@@ -549,7 +368,7 @@ class MWM_VisualTeams_Frontend {
                             if (isset($option['price']) && !empty($option['price'])) {
                                 $options[] = array(
                                     'id' => sanitize_title($option['label'] ?? 'option'),
-                                    'name' => $option['label'] ?? 'Opción',
+                                    'name' => $option['label'] ?? 'Opzione',
                                     'price' => floatval($option['price'])
                                 );
                             }
@@ -577,7 +396,7 @@ class MWM_VisualTeams_Frontend {
                 for ($i = 0; $i < count($matches[1]); $i++) {
                     $options[] = array(
                         'id' => 'extracted_' . $i,
-                        'name' => 'Opción ' . ($i + 1),
+                        'name' => 'Opzione ' . ($i + 1),
                         'price' => floatval($matches[2][$i])
                     );
                 }

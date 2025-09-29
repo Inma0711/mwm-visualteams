@@ -1,9 +1,8 @@
 /**
- * Frontend JavaScript for MWM Visual Teams - AJAX PRICE CALCULATION
- * This calls our PHP endpoint to calculate prices with 70% logic
+ * Frontend JavaScript for MWM Visual Teams - SIMPLE VERSION
  */
 
-var MWMVisualTeams = {
+var MWMVisualTeamsSimple = {
     
     init: function() {
         this.bindEvents();
@@ -12,31 +11,23 @@ var MWMVisualTeams = {
     bindEvents: function() {
         var self = this;
         
-        // Event listener for form changes
-        $(document).on('change', 'select, input[type="radio"], input[type="checkbox"]', function() {
-            self.showCalculationStatus();
-            // Trigger price recalculation after a short delay
+        // Listen for YITH add-on changes
+        $(document).on('change', 'input[name*="yith_wapo"], select[name*="yith_wapo"]', function() {
+            setTimeout(function() {
+                self.recalculatePrices();
+            }, 100);
+        });
+        
+        // Listen for quantity changes
+        $(document).on('change', '.quantity input', function() {
             setTimeout(function() {
                 self.recalculatePrices();
             }, 100);
         });
     },
     
-    showCalculationStatus: function() {
-        // Simple status update
-        var $status = $('#mwm-status-text');
-        if ($status.length) {
-            $status.text('🔄 Recalculando...');
-            setTimeout(function() {
-                $status.text('✅ Cálculo actualizado');
-            }, 1000);
-        }
-    },
-    
     recalculatePrices: function() {
         var self = this;
-        
-        console.log('MWM DEBUG: recalculatePrices called');
         
         // Get current product ID - try multiple methods
         var productId = $('input[name="add-to-cart"]').val() || 
@@ -45,99 +36,94 @@ var MWMVisualTeams = {
                        $('form.cart').data('product_id') ||
                        $('body').data('product_id');
         
-        console.log('MWM DEBUG: Product ID found:', productId);
-        
         if (!productId) {
-            console.log('MWM DEBUG: No product ID found, trying to get from URL');
             // Try to get from URL
             var url = window.location.href;
             var match = url.match(/\/product\/([^\/]+)/);
             if (match) {
-                // This might be a slug, not an ID, but let's try
                 productId = match[1];
-                console.log('MWM DEBUG: Product ID from URL:', productId);
             }
         }
         
         if (!productId) {
-            console.log('MWM DEBUG: Still no product ID found');
             return;
         }
         
         // Get selected options
-        var options = {};
-        $('select, input[type="radio"]:checked, input[type="checkbox"]:checked').each(function() {
-            var $this = $(this);
-            var name = $this.attr('name');
-            var value = $this.val();
+        var options = [];
+        $('input[name*="yith_wapo"]:checked, select[name*="yith_wapo"]').each(function() {
+            var $input = $(this);
+            var name = $input.attr('name');
+            var value = $input.val();
             
-            console.log('MWM DEBUG: Found input:', name, '=', value);
-            
-            if (name && value && name.includes('yith_wapo')) {
-                // Extract addon ID from name (e.g., "yith_wapo_options[123]")
-                var match = name.match(/yith_wapo_options\[(\d+)\]/);
+            if (name && value) {
+                // Extract addon and option IDs
+                var match = name.match(/yith_wapo.*?\[.*?(\d+)(?:-(\d+))?\]/);
                 if (match) {
-                    options[match[1]] = value;
-                    console.log('MWM DEBUG: Added option:', match[1], '=', value);
+                    var addonId = match[1];
+                    var optionId = match[2] || value;
+                    
+                    options.push({
+                        addon_id: addonId,
+                        option_id: optionId,
+                        value: value
+                    });
                 }
             }
         });
         
-        console.log('MWM DEBUG: Final options:', options);
-        
-        if (Object.keys(options).length === 0) {
-            console.log('MWM DEBUG: No YITH WAPO options found');
+        if (options.length === 0) {
             return;
         }
         
-        // Call our AJAX endpoint
-        console.log('MWM DEBUG: Calling AJAX...');
+        // Make AJAX call
         $.ajax({
             url: mwm_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'mwm_calculate_price',
+                action: 'mwm_calculate_addon_price_realtime',
                 product_id: productId,
-                options: options,
+                selected_addons: options,
                 nonce: mwm_ajax.nonce
             },
             success: function(response) {
-                console.log('MWM DEBUG: AJAX success:', response);
                 if (response.success) {
-                    console.log('MWM DEBUG: Price calculated:', response.data.price);
-                    self.updatePriceDisplay(response.data.price);
-                } else {
-                    console.log('MWM DEBUG: Error calculating price:', response.data);
+                    self.updatePriceDisplay(response.data);
                 }
             },
-            error: function(xhr, status, error) {
-                console.log('MWM DEBUG: AJAX error:', error, xhr.responseText);
+            error: function() {
+                // Silent error handling
             }
         });
     },
     
-    updatePriceDisplay: function(newPrice) {
-        // Update price display elements
-        $('.price .amount, .woocommerce-Price-amount, .price .woocommerce-Price-amount').each(function() {
-            var $this = $(this);
-            var currentText = $this.text();
-            var newText = currentText.replace(/[\d,]+[.,]\d{2}/, newPrice.toFixed(2));
-            $this.text(newText);
-        });
+    updatePriceDisplay: function(data) {
+        // Update main product price
+        if (data.final_total) {
+            $('.price .woocommerce-Price-amount .woocommerce-Price-amount').html(this.formatPrice(data.final_total));
+        }
         
-        // Update total price if it exists
-        $('.yith-wapo-total-price, .total-price').each(function() {
-            $(this).text(newPrice.toFixed(2) + ' €');
-        });
+        // Update YITH WAPO totals
+        if (data.total_addons_price) {
+            $('.yith-wapo-total-options, .addon-total').html(this.formatPrice(data.total_addons_price));
+        }
+        
+        if (data.final_total) {
+            $('.yith-wapo-total-order, .order-total').html(this.formatPrice(data.final_total));
+        }
+    },
+    
+    formatPrice: function(price) {
+        var symbol = mwm_ajax.currency_symbol || '€';
+        var decimal = mwm_ajax.decimal_separator || ',';
+        var thousand = mwm_ajax.thousand_separator || '.';
+        var decimals = mwm_ajax.decimals || 2;
+        
+        return price.toFixed(decimals).replace('.', decimal).replace(/\B(?=(\d{3})+(?!\d))/g, thousand) + ' ' + symbol;
     }
 };
 
-// Simple initialization
+// Initialize when document is ready
 jQuery(document).ready(function($) {
-    console.log('MWM DEBUG: Script loaded and ready');
-    console.log('MWM DEBUG: mwm_ajax available:', typeof mwm_ajax !== 'undefined');
-    if (typeof mwm_ajax !== 'undefined') {
-        console.log('MWM DEBUG: AJAX URL:', mwm_ajax.ajax_url);
-    }
-    MWMVisualTeams.init();
+    MWMVisualTeamsSimple.init();
 });

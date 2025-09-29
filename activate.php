@@ -26,7 +26,7 @@ function mwm_visualteams_activate() {
 function mwm_visualteams_activation_notice() {
     echo '<div class="notice notice-success is-dismissible">';
     echo '<p><strong>MWM Visual Teams:</strong> Plugin activado correctamente! 🎉</p>';
-    echo '<p>Ahora puedes configurar las opciones de cálculo sobre precio total.</p>';
+    echo '<p>Ora puoi configurare le opzioni di calcolo sul prezzo totale.</p>';
     echo '</div>';
 }
 

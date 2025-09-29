@@ -185,7 +185,7 @@ class MWM_VisualTeams_Admin {
                     
                     // Proceed for all addons (not just SUPPORTI SPECIALI)
                     // Remove any existing fields first
-                    $('.field-wrap:has(label:contains("Calcular sobre precio total del producto"))').remove();
+                    $('.field-wrap:has(label:contains("Calcola il prezzo totale del prodotto"))').remove();
                     
                     // Look for option cost fields
                     var $sortableElements = $('.ui-sortable');
@@ -194,7 +194,7 @@ class MWM_VisualTeams_Admin {
                         var $option = $(this);
                         
                         // Check if we already added our field to this option
-                        if ($option.find('.field-wrap:has(label:contains("Calcular sobre precio total del producto"))').length > 0) {
+                        if ($option.find('.field-wrap:has(label:contains("Calcola il prezzo totale del prodotto"))').length > 0) {
                             return; // Skip if already exists
                         }
                         
@@ -217,7 +217,7 @@ class MWM_VisualTeams_Admin {
                         if ($costSection.length > 0) {
                             // Create our field
                             var mwmField = '<div class="field-wrap addon-field-grid">';
-                            mwmField += '<label>Calcular sobre precio total del producto</label>';
+                            mwmField += '<label>Calcola il prezzo totale del prodotto</label>';
                             mwmField += '<div class="field">';
                             mwmField += '<div class="yith-plugin-fw-field-wrapper yith-plugin-fw-onoff-field-wrapper">';
                             mwmField += '<div class="yith-plugin-fw-onoff-container">';
@@ -231,7 +231,7 @@ class MWM_VisualTeams_Admin {
                             mwmField += '</div>';
                             mwmField += '</div>';
                             mwmField += '</div>';
-                            mwmField += '<span class="description">Habilita para calcular el precio de esta opción sobre el precio total del producto en lugar del precio base.</span>';
+                            mwmField += '<span class="description">Abilita per calcolare il prezzo di questa opzione sul prezzo totale del prodotto anziché sul prezzo base.</span>';
                             mwmField += '</div>';
                             
                             // Insert after the cost section
@@ -493,7 +493,6 @@ class MWM_VisualTeams_Admin {
                         success: function(response) {
                             if (response.success) {
                                 var value = response.data;
-                                console.log('MWM: Loaded value for addon ' + addonId + ': ' + value);
                                 if (value === 'yes') {
                                     $checkbox.prop('checked', true);
                                 } else {
@@ -502,7 +501,6 @@ class MWM_VisualTeams_Admin {
                             }
                         },
                         error: function(xhr, status, error) {
-                            console.log('MWM: Error loading value: ' + error);
                         }
                     });
                 }
@@ -519,10 +517,8 @@ class MWM_VisualTeams_Admin {
                             nonce: '<?php echo wp_create_nonce('mwm_visualteams_nonce'); ?>'
                         },
                         success: function(response) {
-                            console.log('MWM: Saved value for addon ' + addonId + ': ' + value);
                         },
                         error: function(xhr, status, error) {
-                            console.log('MWM: Error saving value: ' + error);
                         }
                     });
                 }
