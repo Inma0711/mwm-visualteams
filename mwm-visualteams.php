@@ -162,9 +162,11 @@ class MWM_VisualTeams_Plugin {
     }
     
     /**
-     * Frontend scripts
+     * Frontend scripts (disabled to avoid conflict with product-price-update.js)
      */
     public function frontend_scripts() {
+        // Disabled to avoid conflict with product-price-update.js
+        /*
         wp_enqueue_script(
             'mwm-visualteams-frontend',
             MWM_VISUALTEAMS_PLUGIN_URL . 'assets/js/frontend-simple.js',
@@ -172,6 +174,7 @@ class MWM_VisualTeams_Plugin {
             MWM_VISUALTEAMS_VERSION,
             true
         );
+        */
         
         wp_enqueue_style(
             'mwm-visualteams-frontend',

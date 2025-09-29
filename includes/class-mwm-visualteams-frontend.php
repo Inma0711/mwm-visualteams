@@ -22,7 +22,8 @@ class MWM_VisualTeams_Frontend {
         
         // Only hook into WooCommerce if it's active
         if (class_exists('WooCommerce')) {
-            add_action('woocommerce_after_add_to_cart_button', array($this, 'add_frontend_scripts'));
+            // Disabled to avoid conflict with product-price-update.js
+            // add_action('woocommerce_after_add_to_cart_button', array($this, 'add_frontend_scripts'));
             
             // Add provisional checkboxes for 70% calculation
             add_action('woocommerce_after_single_product_summary', array($this, 'add_provisional_checkboxes'), 15);
@@ -42,6 +43,8 @@ class MWM_VisualTeams_Frontend {
      * Enqueue frontend scripts
      */
     public function enqueue_scripts() {
+        // Disabled to avoid conflict with product-price-update.js
+        /*
         // Load simplified JavaScript
         wp_enqueue_script(
             'mwm-visualteams-frontend',
@@ -50,6 +53,7 @@ class MWM_VisualTeams_Frontend {
             MWM_VISUALTEAMS_VERSION,
             true
         );
+        */
         
         // Only load WooCommerce specific data if WooCommerce is active
         if (class_exists('WooCommerce') && is_product()) {

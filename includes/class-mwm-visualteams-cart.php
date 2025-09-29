@@ -40,6 +40,13 @@ class MWM_VisualTeams_Cart {
             // Filter to modify addon display in cart
             add_filter('yith_wapo_addon_display_on_cart', array($this, 'modify_addon_display_in_cart'), 10, 8);
             
+            // Add JavaScript for real-time price calculation on product page
+            add_action('wp_enqueue_scripts', array($this, 'enqueue_product_scripts'));
+            
+            // AJAX handler for real-time price calculation
+            add_action('wp_ajax_mwm_calculate_addon_price_realtime', array($this, 'ajax_calculate_addon_price_realtime'));
+            add_action('wp_ajax_nopriv_mwm_calculate_addon_price_realtime', array($this, 'ajax_calculate_addon_price_realtime'));
+            
             // Hook into cart to show product metadata
             add_action('woocommerce_cart_loaded_from_session', array($this, 'debug_cart_metadata'));
             add_action('woocommerce_after_cart_item_name', array($this, 'show_cart_item_metadata'), 10, 2);
@@ -892,6 +899,152 @@ class MWM_VisualTeams_Cart {
         }
         
         return null;
+    }
+    
+    /**
+     * Enqueue scripts for product page
+     */
+    public function enqueue_product_scripts() {
+        if (is_product()) {
+            wp_enqueue_script('mwm-product-price-update', plugin_dir_url(__FILE__) . '../assets/js/product-price-update.js', array('jquery'), '1.0.0', true);
+            
+            $product_id = get_the_ID();
+            $product = wc_get_product($product_id);
+            $base_price = $product ? $product->get_regular_price() : 0;
+            
+            error_log('MWM DEBUG: Enqueuing product scripts for product ID: ' . $product_id);
+            error_log('MWM DEBUG: Base price: ' . $base_price);
+            
+            wp_localize_script('mwm-product-price-update', 'mwmProductData', array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('mwm_product_nonce'),
+                'product_id' => $product_id,
+                'product_base_price' => $base_price
+            ));
+        }
+    }
+    
+    /**
+     * AJAX handler for real-time addon price calculation
+     */
+    public function ajax_calculate_addon_price_realtime() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'mwm_product_nonce')) {
+            wp_die('Security check failed');
+        }
+        
+        $product_id = intval($_POST['product_id']);
+        $selected_addons = $_POST['selected_addons']; // Array of selected addons
+        
+        error_log('MWM DEBUG: AJAX called with product_id: ' . $product_id);
+        error_log('MWM DEBUG: Selected addons: ' . print_r($selected_addons, true));
+        
+        // Get product
+        $product = wc_get_product($product_id);
+        if (!$product) {
+            wp_send_json_error('Product not found');
+        }
+        
+        $base_price = $product->get_regular_price();
+        $normal_addons_price = 0;
+        $total_calculation_addons_price = 0;
+        
+        // Separate addons into normal and calculate_on_total
+        $normal_addons = array();
+        $total_calculation_addons = array();
+        
+        foreach ($selected_addons as $addon_data) {
+            $addon_id = intval($addon_data['addon_id']);
+            $option_id = intval($addon_data['option_id']);
+            $value = $addon_data['value'];
+            
+            // Check if this addon should calculate on total
+            $option_name = 'mwm_calculate_on_total_' . $addon_id;
+            $calculate_on_total = get_option($option_name, '');
+            
+            if ($calculate_on_total === 'yes') {
+                $total_calculation_addons[] = array(
+                    'addon_id' => $addon_id,
+                    'option_id' => $option_id,
+                    'value' => $value
+                );
+            } else {
+                $normal_addons[] = array(
+                    'addon_id' => $addon_id,
+                    'option_id' => $option_id,
+                    'value' => $value
+                );
+            }
+        }
+        
+        // Calculate normal addons first
+        error_log('MWM DEBUG: Normal addons count: ' . count($normal_addons));
+        foreach ($normal_addons as $addon_data) {
+            error_log('MWM DEBUG: Processing normal addon: ' . $addon_data['addon_id'] . '-' . $addon_data['option_id']);
+            $addon_info = yith_wapo_get_option_info($addon_data['addon_id'], $addon_data['option_id']);
+            if ($addon_info) {
+                error_log('MWM DEBUG: Addon info found: ' . print_r($addon_info, true));
+                $addon_price = $this->calculate_single_addon_price($addon_info, $base_price);
+                error_log('MWM DEBUG: Calculated addon price: ' . $addon_price);
+                $normal_addons_price += $addon_price;
+            } else {
+                error_log('MWM DEBUG: No addon info found for: ' . $addon_data['addon_id'] . '-' . $addon_data['option_id']);
+            }
+        }
+        
+        // Calculate total base price (product + normal addons)
+        $total_base_price = $base_price + $normal_addons_price;
+        
+        // Calculate addons that should calculate on total
+        foreach ($total_calculation_addons as $addon_data) {
+            $addon_info = yith_wapo_get_option_info($addon_data['addon_id'], $addon_data['option_id']);
+            if ($addon_info) {
+                $addon_price = $this->calculate_single_addon_price($addon_info, $total_base_price);
+                $total_calculation_addons_price += $addon_price;
+            }
+        }
+        
+        // Calculate final totals
+        $total_addons_price = $normal_addons_price + $total_calculation_addons_price;
+        $final_total = $base_price + $total_addons_price;
+        
+        // Calculate individual addon prices for display
+        $individual_addon_prices = array();
+        foreach ($selected_addons as $addon_data) {
+            $addon_id = $addon_data['addon_id'];
+            $option_id = $addon_data['option_id'];
+            
+            $addon_info = yith_wapo_get_option_info($addon_id, $option_id);
+            if ($addon_info) {
+                // Check if this addon should calculate on total
+                $option_name = 'mwm_calculate_on_total_' . $addon_id;
+                $calculate_on_total = get_option($option_name, '');
+                
+                if ($calculate_on_total === 'yes') {
+                    // Calculate on total base price
+                    $addon_price = $this->calculate_single_addon_price($addon_info, $total_base_price);
+                } else {
+                    // Calculate on product base price
+                    $addon_price = $this->calculate_single_addon_price($addon_info, $base_price);
+                }
+                
+                $individual_addon_prices[$addon_id] = $addon_price;
+            }
+        }
+        
+        wp_send_json_success(array(
+            'base_price' => $base_price,
+            'normal_addons_price' => $normal_addons_price,
+            'total_calculation_addons_price' => $total_calculation_addons_price,
+            'total_addons_price' => $total_addons_price,
+            'final_total' => $final_total,
+            'individual_addon_prices' => $individual_addon_prices,
+            'formatted_prices' => array(
+                'base_price' => wc_price($base_price),
+                'total_addons_price' => wc_price($total_addons_price),
+                'final_total' => wc_price($final_total)
+            )
+        ));
     }
     
 } 
