@@ -95,7 +95,14 @@ class MWM_VisualTeams_Plugin {
         // Frontend hooks
         add_action('wp_enqueue_scripts', array($this, 'frontend_scripts'));
         
-        // Initialize classes
+        // Initialize classes after WooCommerce is loaded
+        add_action('woocommerce_init', array($this, 'init_classes'));
+    }
+    
+    /**
+     * Initialize classes after WooCommerce is ready
+     */
+    public function init_classes() {
         try {
             if (class_exists('MWM_VisualTeams_Admin')) {
                 new MWM_VisualTeams_Admin();

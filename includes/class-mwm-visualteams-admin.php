@@ -24,6 +24,9 @@ class MWM_VisualTeams_Admin {
         add_action('yith_wapo_save_addon', array($this, 'save_calculate_on_total_field'), 10, 2);
         add_action('save_post', array($this, 'save_calculate_on_total_field_generic'), 10, 2);
         
+        // Intercept YITH WAPO form submission
+        add_action('admin_init', array($this, 'intercept_yith_form_save'));
+        
         // AJAX handlers
         add_action('wp_ajax_mwm_get_calculate_on_total', array($this, 'ajax_get_calculate_on_total'));
         add_action('wp_ajax_mwm_save_calculate_on_total', array($this, 'ajax_save_calculate_on_total'));
@@ -180,12 +183,9 @@ class MWM_VisualTeams_Admin {
                         isSupportiSpeciali = ($titleField.val() === 'SUPPORTI SPECIALI');
                     }
                     
-                    // Only proceed if we're in SUPPORTI SPECIALI
-                    if (!isSupportiSpeciali) {
-                        // Remove any existing fields if we're not in SUPPORTI SPECIALI
-                        $('.field-wrap:has(label:contains("Calcular sobre precio total del producto"))').remove();
-                        return;
-                    }
+                    // Proceed for all addons (not just SUPPORTI SPECIALI)
+                    // Remove any existing fields first
+                    $('.field-wrap:has(label:contains("Calcular sobre precio total del producto"))').remove();
                     
                     // Look for option cost fields
                     var $sortableElements = $('.ui-sortable');
@@ -198,36 +198,8 @@ class MWM_VisualTeams_Admin {
                             return; // Skip if already exists
                         }
                         
-                        // Check if this is a checkbox option - try multiple strategies
-                        var isCheckbox = false;
-                        
-                        // Strategy 1: Look for checkbox headers
-                        var $checkboxHeader = $option.find('.option-header:contains("CHECKBOX")');
-                        if ($checkboxHeader.length === 0) {
-                            $checkboxHeader = $option.find('.option-header:contains("Checkbox")');
-                        }
-                        if ($checkboxHeader.length === 0) {
-                            $checkboxHeader = $option.find('.option-header:contains("checkbox")');
-                        }
-                        if ($checkboxHeader.length === 0) {
-                            $checkboxHeader = $option.find('.option-header:contains("CHECK")');
-                        }
-                        
-                        // Strategy 2: Look for checkbox inputs
-                        var $checkboxInputs = $option.find('input[type="checkbox"]');
-                        
-                        // Strategy 3: Look for any element containing "checkbox" text
-                        var $checkboxText = $option.find('*:contains("checkbox"), *:contains("Checkbox"), *:contains("CHECKBOX")');
-                        
-                        // Strategy 4: Look for specific classes that might indicate checkboxes
-                        var $checkboxClasses = $option.find('.checkbox, .check, .option-checkbox, .addon-checkbox');
-                        
-                        // Determine if this is a checkbox based on any strategy
-                        if ($checkboxHeader.length > 0 || $checkboxInputs.length > 0 || $checkboxText.length > 0 || $checkboxClasses.length > 0) {
-                            isCheckbox = true;
-                        } else {
-                            return; // Skip if not a checkbox
-                        }
+                        // Add the field to all addon options (not just checkboxes)
+                        var isCheckbox = true; // Always proceed
                         
                         // Get the checkbox label to check if it's "Cromato" or "Olografico"
                         var $labelField = $option.find('input[name*="label"]');
@@ -249,7 +221,7 @@ class MWM_VisualTeams_Admin {
                             mwmField += '<div class="field">';
                             mwmField += '<div class="yith-plugin-fw-field-wrapper yith-plugin-fw-onoff-field-wrapper">';
                             mwmField += '<div class="yith-plugin-fw-onoff-container">';
-                            mwmField += '<input type="checkbox" name="calculate_on_total" value="yes" class="on_off" />';
+                            mwmField += '<input type="checkbox" name="mwm_calculate_on_total" value="yes" class="on_off" id="mwm_calculate_on_total_' + index + '" />';
                             mwmField += '<span class="yith-plugin-fw-onoff">';
                             mwmField += '<span class="yith-plugin-fw-onoff_handle">';
                             mwmField += '<svg class="yith-plugin-fw-onoff_icon yith-plugin-fw-onoff_icon--on" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="#8d9c2c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" role="img"><path d="M6 10l3 3 5-5"/></svg>';
@@ -264,6 +236,23 @@ class MWM_VisualTeams_Admin {
                             
                             // Insert after the cost section
                             $costSection.after(mwmField);
+                            
+                            // Load saved value and set up event handlers
+                            var $newField = $costSection.next('.field-wrap');
+                            var $checkbox = $newField.find('input[name="mwm_calculate_on_total"]');
+                            
+                            // Get current addon ID
+                            var addonId = getCurrentAddonId();
+                            if (addonId) {
+                                // Load saved value
+                                loadCalculateOnTotalValue(addonId, $checkbox);
+                                
+                                // Set up change handler
+                                $checkbox.on('change', function() {
+                                    var value = $(this).is(':checked') ? 'yes' : 'no';
+                                    saveCalculateOnTotalValue(addonId, value);
+                                });
+                            }
                         }
                     });
                 }
@@ -491,6 +480,53 @@ class MWM_VisualTeams_Admin {
                     return null;
                 }
                 
+                // Function to load saved value
+                function loadCalculateOnTotalValue(addonId, $checkbox) {
+                    $.ajax({
+                        url: mwm_ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'mwm_get_calculate_on_total',
+                            addon_id: addonId,
+                            nonce: '<?php echo wp_create_nonce('mwm_visualteams_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                var value = response.data;
+                                console.log('MWM: Loaded value for addon ' + addonId + ': ' + value);
+                                if (value === 'yes') {
+                                    $checkbox.prop('checked', true);
+                                } else {
+                                    $checkbox.prop('checked', false);
+                                }
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.log('MWM: Error loading value: ' + error);
+                        }
+                    });
+                }
+                
+                // Function to save value
+                function saveCalculateOnTotalValue(addonId, value) {
+                    $.ajax({
+                        url: mwm_ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'mwm_save_calculate_on_total',
+                            addon_id: addonId,
+                            value: value,
+                            nonce: '<?php echo wp_create_nonce('mwm_visualteams_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            console.log('MWM: Saved value for addon ' + addonId + ': ' + value);
+                        },
+                        error: function(xhr, status, error) {
+                            console.log('MWM: Error saving value: ' + error);
+                        }
+                    });
+                }
+                
                 // Remove the setInterval to prevent continuous execution
             });
             </script>
@@ -505,8 +541,8 @@ class MWM_VisualTeams_Admin {
         error_log('MWM Visual Teams: YITH save hook triggered for addon ID: ' . $addon_id);
         error_log('MWM Visual Teams: POST data: ' . print_r($_POST, true));
         
-        if (isset($_POST['calculate_on_total'])) {
-            $calculate_on_total = sanitize_text_field($_POST['calculate_on_total']);
+        if (isset($_POST['mwm_calculate_on_total'])) {
+            $calculate_on_total = sanitize_text_field($_POST['mwm_calculate_on_total']);
             update_post_meta($addon_id, '_calculate_on_total', $calculate_on_total);
             error_log('MWM Visual Teams: YITH save - Saved calculate_on_total: ' . $calculate_on_total);
         } else {
@@ -526,8 +562,8 @@ class MWM_VisualTeams_Admin {
         
         error_log('MWM Visual Teams: Generic save for post ID: ' . $post_id);
         
-        if (isset($_POST['calculate_on_total'])) {
-            $calculate_on_total = sanitize_text_field($_POST['calculate_on_total']);
+        if (isset($_POST['mwm_calculate_on_total'])) {
+            $calculate_on_total = sanitize_text_field($_POST['mwm_calculate_on_total']);
             update_post_meta($post_id, '_calculate_on_total', $calculate_on_total);
             error_log('MWM Visual Teams: Generic save - Saved calculate_on_total: ' . $calculate_on_total);
         } else {
@@ -546,7 +582,8 @@ class MWM_VisualTeams_Admin {
         }
         
         $addon_id = intval($_POST['addon_id']);
-        $calculate_on_total = get_post_meta($addon_id, '_calculate_on_total', true);
+        $option_name = 'mwm_calculate_on_total_' . $addon_id;
+        $calculate_on_total = get_option($option_name, '');
         
         error_log('MWM Visual Teams: AJAX request for addon ID: ' . $addon_id . ', value: ' . $calculate_on_total);
         
@@ -571,11 +608,44 @@ class MWM_VisualTeams_Admin {
         
         error_log('MWM Debug: Addon ID: ' . $addon_id . ', Value: ' . $calculate_on_total);
         
-        $result = update_post_meta($addon_id, '_calculate_on_total', $calculate_on_total);
+        // Since YITH WAPO addons are not WordPress posts, we need to store this in a custom table or option
+        // For now, let's use WordPress options to store this data
+        $option_name = 'mwm_calculate_on_total_' . $addon_id;
+        $result = update_option($option_name, $calculate_on_total);
         
         error_log('MWM Debug: Update result: ' . ($result ? 'success' : 'failed'));
         error_log('MWM Visual Teams: AJAX save for addon ID: ' . $addon_id . ', value: ' . $calculate_on_total);
         
         wp_send_json_success('Saved');
+    }
+    
+    /**
+     * Intercept YITH WAPO form save to preserve our field
+     */
+    public function intercept_yith_form_save() {
+        // Only run on YITH WAPO admin pages
+        if (!isset($_GET['page']) || $_GET['page'] !== 'yith_wapo_panel') {
+            return;
+        }
+        
+        // Check if this is a form submission
+        if (isset($_POST['action']) && $_POST['action'] === 'yith_wapo_save_addon') {
+            error_log('MWM DEBUG: Intercepting YITH form save');
+            error_log('MWM DEBUG: POST data: ' . print_r($_POST, true));
+            
+            // Look for our field in the POST data
+            if (isset($_POST['mwm_calculate_on_total'])) {
+                $addon_id = intval($_POST['addon_id']);
+                $value = sanitize_text_field($_POST['mwm_calculate_on_total']);
+                
+                error_log('MWM DEBUG: Found our field in POST - Addon ID: ' . $addon_id . ', Value: ' . $value);
+                
+                // Save it immediately
+                $option_name = 'mwm_calculate_on_total_' . $addon_id;
+                update_option($option_name, $value);
+                
+                error_log('MWM DEBUG: Saved calculate_on_total: ' . $value);
+            }
+        }
     }
 } 

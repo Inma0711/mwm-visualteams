@@ -14,815 +14,450 @@ class MWM_VisualTeams_Cart {
     }
     
     public function init() {
+        error_log('MWM DEBUG: MWM_VisualTeams_Cart init() called');
+        
         // Only hook into WooCommerce if it's active
         if (class_exists('WooCommerce')) {
-            // Hook into cart calculations
-            add_filter('woocommerce_add_cart_item_data', array($this, 'add_cart_item_data'), 10, 3);
-            add_filter('woocommerce_get_item_data', array($this, 'get_item_data'), 10, 2);
-            add_action('woocommerce_before_calculate_totals', array($this, 'calculate_cart_totals'), 10, 1);
+            error_log('MWM DEBUG: WooCommerce is active, registering filters');
             
-            // Hook into WooCommerce cart calculation
-            add_action('woocommerce_before_calculate_totals', array($this, 'calculate_cart_totals'), 10, 1);
+            // Hook into YITH WAPO total calculation to modify percentage calculations on total price
+            add_filter('yith_wapo_get_total_by_add_ons_list', array($this, 'modify_yith_total_by_add_ons_list'), 10, 3);
             
-            // Hook into YITH WAPO calculation
-            add_filter('yith_wapo_calculate_addon_price', array($this, 'modify_yith_addon_price'), 10, 4);
-            add_filter('yith_wapo_calculate_addon_price_on_cart', array($this, 'modify_yith_addon_price_cart'), 10, 4);
+            // Also hook into other YITH WAPO filters to debug
+            add_filter('yith_wapo_calculate_addon_price', array($this, 'debug_yith_addon_price'), 5, 4);
+            add_filter('yith_wapo_calculate_addon_price_on_cart', array($this, 'debug_yith_addon_price_cart'), 5, 4);
             
-            // Hook into YITH WAPO total calculation
-            add_filter('yith_wapo_calculate_addon_price_on_cart', array($this, 'modify_yith_total_calculation'), 20, 4);
-            add_action('yith_wapo_before_calculate_totals', array($this, 'before_yith_calculate_totals'), 10, 1);
+            // Hook into cart calculation to modify prices
+            add_action('woocommerce_before_calculate_totals', array($this, 'modify_cart_totals'), 10, 1);
             
-            // Hook into WooCommerce product price calculation
-            add_filter('woocommerce_product_get_price', array($this, 'modify_product_price'), 10, 2);
-            add_filter('woocommerce_product_variation_get_price', array($this, 'modify_product_price'), 10, 2);
+            // Hook into cart to show product metadata
+            add_action('woocommerce_cart_loaded_from_session', array($this, 'debug_cart_metadata'));
+            add_action('woocommerce_after_cart_item_name', array($this, 'show_cart_item_metadata'), 10, 2);
             
-            // AJAX endpoint for price calculation
-            add_action('wp_ajax_mwm_calculate_price', array($this, 'ajax_calculate_price'));
-            add_action('wp_ajax_nopriv_mwm_calculate_price', array($this, 'ajax_calculate_price'));
+            error_log('MWM DEBUG: All filters registered');
+        } else {
+            error_log('MWM DEBUG: WooCommerce not active');
         }
     }
     
     /**
-     * Add custom data to cart item
+     * Debug function to see if YITH addon price calculation is being called
      */
-    public function add_cart_item_data($cart_item_data, $product_id, $variation_id) {
-        // Store the original product price
-        $product = wc_get_product($product_id);
-        if ($product) {
-            $cart_item_data['mwm_original_price'] = $product->get_price();
+    public function debug_yith_addon_price($price, $addon, $option, $product) {
+        error_log('MWM DEBUG: yith_wapo_calculate_addon_price called - Addon: ' . (isset($addon->id) ? $addon->id : 'unknown') . ', Price: ' . $price);
+        return $price;
+    }
+    
+    /**
+     * Debug function to see if YITH addon price calculation on cart is being called
+     */
+    public function debug_yith_addon_price_cart($price, $addon, $option, $cart_item) {
+        error_log('MWM DEBUG: yith_wapo_calculate_addon_price_on_cart called - Addon: ' . (isset($addon->id) ? $addon->id : 'unknown') . ', Price: ' . $price);
+        return $price;
+    }
+    
+    /**
+     * Debug cart metadata when cart is loaded
+     */
+    public function debug_cart_metadata() {
+        if (!WC()->cart || WC()->cart->is_empty()) {
+            error_log('MWM DEBUG: Cart is empty');
+            return;
         }
         
-        return $cart_item_data;
+        error_log('MWM DEBUG: === CART METADATA DEBUG ===');
+        error_log('MWM DEBUG: Cart items count: ' . WC()->cart->get_cart_contents_count());
+        
+        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+            error_log('MWM DEBUG: --- Cart Item: ' . $cart_item_key . ' ---');
+            error_log('MWM DEBUG: Product ID: ' . $cart_item['product_id']);
+            error_log('MWM DEBUG: Product Name: ' . $cart_item['data']->get_name());
+            error_log('MWM DEBUG: Quantity: ' . $cart_item['quantity']);
+            error_log('MWM DEBUG: Price: ' . $cart_item['data']->get_price());
+            error_log('MWM DEBUG: Line Total: ' . $cart_item['line_total']);
+            error_log('MWM DEBUG: Line Subtotal: ' . $cart_item['line_subtotal']);
+            
+            // Show all cart item data
+            error_log('MWM DEBUG: All cart item data: ' . print_r($cart_item, true));
+            
+            // Show YITH WAPO specific data
+            if (isset($cart_item['yith_wapo_options'])) {
+                error_log('MWM DEBUG: YITH WAPO Options: ' . print_r($cart_item['yith_wapo_options'], true));
+            }
+            
+            if (isset($cart_item['yith_wapo_total_options_price'])) {
+                error_log('MWM DEBUG: YITH WAPO Total Options Price: ' . $cart_item['yith_wapo_total_options_price']);
+            }
+            
+            // Show product metadata
+            $product_meta = get_post_meta($cart_item['product_id']);
+            error_log('MWM DEBUG: Product Meta: ' . print_r($product_meta, true));
+            
+            // Check calculate_on_total options for all addons in this product
+            if (isset($cart_item['yith_wapo_options'])) {
+                error_log('MWM DEBUG: === CHECKING CALCULATE_ON_TOTAL OPTIONS ===');
+                foreach ($cart_item['yith_wapo_options'] as $option_group) {
+                    foreach ($option_group as $key => $value) {
+                        if ($key && '' !== $value) {
+                            $values = YITH_WAPO::get_instance()->split_addon_and_option_ids($key, $value);
+                            $addon_id = $values['addon_id'];
+                            $option_name = 'mwm_calculate_on_total_' . $addon_id;
+                            $calculate_on_total = get_option($option_name, '');
+                            error_log('MWM DEBUG: Addon ' . $addon_id . ' (' . $key . '): ' . $calculate_on_total);
+                        }
+                    }
+                }
+                error_log('MWM DEBUG: === END CALCULATE_ON_TOTAL CHECK ===');
+            }
+        }
+        
+        error_log('MWM DEBUG: === END CART METADATA DEBUG ===');
     }
     
     /**
-     * Calculate cart totals with total price calculation
+     * Show cart item metadata in the cart page
      */
-    public function calculate_cart_totals($cart) {
+    public function show_cart_item_metadata($cart_item, $cart_item_key) {
         if (is_admin() && !defined('DOING_AJAX')) {
             return;
         }
         
-        error_log('MWM DEBUG: calculate_cart_totals called');
-        error_log('MWM DEBUG: Cart has ' . count($cart->get_cart()) . ' items');
+        echo '<div style="background: #f0f0f0; padding: 10px; margin: 5px 0; border: 1px solid #ccc; font-size: 12px;">';
+        echo '<strong>MWM Debug - Cart Item Metadata:</strong><br>';
+        echo '<strong>Product ID:</strong> ' . $cart_item['product_id'] . '<br>';
+        echo '<strong>Quantity:</strong> ' . $cart_item['quantity'] . '<br>';
+        echo '<strong>Price:</strong> ' . $cart_item['data']->get_price() . '<br>';
+        echo '<strong>Line Total:</strong> ' . $cart_item['line_total'] . '<br>';
+        
+        if (isset($cart_item['yith_wapo_options'])) {
+            echo '<strong>YITH WAPO Options:</strong> ' . print_r($cart_item['yith_wapo_options'], true) . '<br>';
+        }
+        
+        if (isset($cart_item['yith_wapo_total_options_price'])) {
+            echo '<strong>YITH WAPO Total Options Price:</strong> ' . $cart_item['yith_wapo_total_options_price'] . '<br>';
+        }
+        
+        echo '</div>';
+    }
+    
+    /**
+     * Modify cart totals to handle calculate_on_total addons
+     */
+    public function modify_cart_totals($cart) {
+        if (is_admin() && !defined('DOING_AJAX')) {
+            return;
+        }
+        
+        error_log('MWM DEBUG: modify_cart_totals called');
         
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-            error_log('MWM DEBUG: Processing cart item ' . $cart_item_key);
-            $this->calculate_item_total_price($cart_item_key, $cart_item, $cart);
+            if (isset($cart_item['yith_wapo_options']) && !empty($cart_item['yith_wapo_options'])) {
+                error_log('MWM DEBUG: Processing cart item with YITH options: ' . $cart_item_key);
+                
+                // Check if this item has addons with calculate_on_total
+                $has_calculate_on_total = false;
+                $total_calculation_addons = array();
+                $normal_addons = array();
+                
+                foreach ($cart_item['yith_wapo_options'] as $option_group) {
+                    foreach ($option_group as $key => $value) {
+                        if ($key && '' !== $value) {
+                            $values = YITH_WAPO::get_instance()->split_addon_and_option_ids($key, $value);
+                            $addon_id = $values['addon_id'];
+                            $option_id = $values['option_id'];
+                            
+                            $option_name = 'mwm_calculate_on_total_' . $addon_id;
+                            $calculate_on_total = get_option($option_name, '');
+                            
+                            $addon_data = array(
+                                'key' => $key,
+                                'value' => $value,
+                                'addon_id' => $addon_id,
+                                'option_id' => $option_id
+                            );
+                            
+                            if ($calculate_on_total === 'yes') {
+                                $has_calculate_on_total = true;
+                                $total_calculation_addons[] = $addon_data;
+                                error_log('MWM DEBUG: Found addon with calculate_on_total: ' . $addon_id);
+                            } else {
+                                $normal_addons[] = $addon_data;
+                            }
+                        }
+                    }
+                }
+                
+                if ($has_calculate_on_total) {
+                    error_log('MWM DEBUG: Recalculating prices for item with calculate_on_total addons');
+                    $this->recalculate_cart_item_with_total_calculation($cart_item_key, $cart_item, $cart, $normal_addons, $total_calculation_addons);
+                }
+            }
         }
     }
     
     /**
-     * Calculate total price for a specific cart item
+     * Recalculate cart item with total calculation addons
      */
-    private function calculate_item_total_price($cart_item_key, $cart_item, $cart) {
+    private function recalculate_cart_item_with_total_calculation($cart_item_key, $cart_item, $cart, $normal_addons, $total_calculation_addons) {
         $product_id = $cart_item['product_id'];
-        $variation_id = $cart_item['variation_id'];
+        $base_price = $cart_item['yith_wapo_item_price']; // Use the base price from YITH
         
-        // Debug logging
-        error_log('MWM DEBUG: calculate_item_total_price called for product ' . $product_id);
-        error_log('MWM DEBUG: Cart item data: ' . print_r($cart_item, true));
+        error_log('MWM DEBUG: Recalculating - Product: ' . $product_id . ', Base price: ' . $base_price);
         
-        // Get YITH add-ons for this product
-        $addons = $this->get_product_addons($product_id);
+        // Calculate normal addons first
+        $normal_total = $base_price;
+        $normal_addons_price = 0;
         
-        error_log('MWM DEBUG: Found ' . count($addons) . ' addons for product ' . $product_id);
-        
-        if (empty($addons)) {
-            error_log('MWM DEBUG: No addons found, returning');
-            return;
+        foreach ($normal_addons as $addon_data) {
+            $option_price = $this->calculate_addon_price_for_total($addon_data, $base_price, $cart_item);
+            $normal_total += $option_price;
+            $normal_addons_price += $option_price;
         }
         
-        $base_price = $cart_item['mwm_original_price'] ?? $cart_item['data']->get_price();
-        $selected_options = array();
-        $cromato_olografico_options = array();
-        $other_options = array();
-        $modello_options = array();
+        error_log('MWM DEBUG: Normal total (base + normal addons): ' . $normal_total);
+        error_log('MWM DEBUG: Normal addons price: ' . $normal_addons_price);
         
-        // First pass: collect all selected options
-        foreach ($addons as $addon) {
-            if (isset($cart_item['yith_wapo_options'][$addon->id])) {
-                $option_value = $cart_item['yith_wapo_options'][$addon->id];
-                $option_price = $this->calculate_option_price($addon, $option_value, $base_price);
-                
-                $option_data = array(
-                    'addon' => $addon,
-                    'value' => $option_value,
-                    'price' => $option_price,
-                    'is_cromato_olografico' => $this->is_cromato_olografico_option($addon, $option_value),
-                    'is_modello' => $this->is_modello_option($addon, $option_value)
-                );
-                
-                $selected_options[] = $option_data;
-                
-                if ($option_data['is_modello']) {
-                    $modello_options[] = $option_data;
-                } elseif ($option_data['is_cromato_olografico']) {
-                    $cromato_olografico_options[] = $option_data;
-                } else {
-                    $other_options[] = $option_data;
-                }
-            }
-        }
-        
-        // Check if any option uses total price calculation
-        $has_total_calculation = false;
-        foreach ($selected_options as $option) {
-            if (isset($option['addon']->settings['calculate_on_total']) && $option['addon']->settings['calculate_on_total'] === 'yes') {
-                $has_total_calculation = true;
-                break;
-            }
-        }
-        
-        // If no total calculation is enabled, use normal calculation
-        if (!$has_total_calculation) {
-            $total_price = $base_price;
-            foreach ($selected_options as $option) {
-                $total_price += $option['price'];
-            }
-            $cart->cart_contents[$cart_item_key]['data']->set_price($total_price);
-            return;
-        }
-        
-        // Apply the new 70% logic with MODELLO support
-        error_log('MWM DEBUG: Before calculation - Base: ' . $base_price . ', Cromato/Olografico: ' . count($cromato_olografico_options) . ', Other: ' . count($other_options) . ', Modello: ' . count($modello_options));
-        
-        $total_price = $this->calculate_with_modello_logic($base_price, $cromato_olografico_options, $other_options, $modello_options);
-        
-        error_log('MWM DEBUG: After calculation - Total price: ' . $total_price . ', Options total: ' . ($total_price - $base_price));
-        
-        // Update cart item price
-        $cart->cart_contents[$cart_item_key]['data']->set_price($total_price);
-    }
-    
-    /**
-     * Calculate price using the 70% logic with MODELLO support
-     */
-    private function calculate_with_modello_logic($base_price, $cromato_olografico_options, $other_options, $modello_options) {
-        error_log('MWM DEBUG: calculate_with_modello_logic called with base: ' . $base_price);
-        error_log('MWM DEBUG: Cromato/Olografico options: ' . count($cromato_olografico_options));
-        error_log('MWM DEBUG: Other options: ' . count($other_options));
-        error_log('MWM DEBUG: Modello options: ' . count($modello_options));
-        
-        // Si no hay Cromato/Olográfico, usar cálculo normal (incluyendo MODELLO)
-        if (empty($cromato_olografico_options)) {
-            error_log('MWM DEBUG: No Cromato/Olografico - using normal calculation');
-            $total_price = $base_price;
-            foreach ($other_options as $option) {
-                $total_price += $option['price'];
-                error_log('MWM DEBUG: Added other option: ' . $option['name'] . ' (+' . $option['price'] . ')');
-            }
-            foreach ($modello_options as $option) {
-                $total_price += $option['price'];
-                error_log('MWM DEBUG: Added modello option: ' . $option['name'] . ' (+' . $option['price'] . ')');
-            }
-            error_log('MWM DEBUG: Normal calculation result: ' . $total_price);
-            return $total_price;
-        }
-        
-        // Si solo Cromato/Olográfico (sin otras opciones), usar suma normal + MODELLO
-        if (empty($other_options)) {
-            $total_price = $base_price;
-            foreach ($cromato_olografico_options as $option) {
-                $total_price += $option['price'];
-            }
-            foreach ($modello_options as $option) {
-                $total_price += $option['price'];
-            }
-            return $total_price;
-        }
-        
-        // Si hay Cromato/Olográfico + otras opciones, aplicar 70% + MODELLO
-        error_log('MWM DEBUG: Applying 70% calculation with MODELLO');
-        
-        // Paso 1: Sumar todo (base + Cromato/Olográfico + otras opciones) - SIN MODELLO
-        $step1_total = $base_price;
-        foreach ($cromato_olografico_options as $option) {
-            $step1_total += $option['price'];
-            error_log('MWM DEBUG: Added cromato/olografico: ' . $option['name'] . ' (+' . $option['price'] . ')');
-        }
-        foreach ($other_options as $option) {
-            $step1_total += $option['price'];
-            error_log('MWM DEBUG: Added other option: ' . $option['name'] . ' (+' . $option['price'] . ')');
-        }
-        error_log('MWM DEBUG: Step 1 total: ' . $step1_total);
-        
-        // Paso 2: Restar Cromato/Olográfico
-        $cromato_olografico_total = 0;
-        foreach ($cromato_olografico_options as $option) {
-            $cromato_olografico_total += $option['price'];
-        }
-        $step2_without_cromato = $step1_total - $cromato_olografico_total;
-        error_log('MWM DEBUG: Step 2 without cromato: ' . $step2_without_cromato);
-        
-        // Paso 3: Calcular 70% del resultado
-        $step3_percentage = $step2_without_cromato * 0.70;
-        error_log('MWM DEBUG: Step 3 (70%): ' . $step3_percentage);
-        
-        // Paso 4: Sumar las otras opciones
-        $other_options_total = 0;
-        foreach ($other_options as $option) {
-            $other_options_total += $option['price'];
-        }
-        $final_total = $step3_percentage + $other_options_total;
-        error_log('MWM DEBUG: Step 4 final (without modello): ' . $final_total);
-        
-        // Paso 5: Añadir MODELLO al final (sin afectar el 70%)
-        $modello_total = 0;
-        foreach ($modello_options as $option) {
-            $modello_total += $option['price'];
-            error_log('MWM DEBUG: Added modello: ' . $option['name'] . ' (+' . $option['price'] . ')');
-        }
-        error_log('MWM DEBUG: Modello total: ' . $modello_total);
-        
-        $result = $base_price + $final_total + $modello_total;
-        error_log('MWM DEBUG: Final result: ' . $result);
-        
-        return $result;
-    }
-    
-    /**
-     * Calculate price using the 70% logic (old version - kept for compatibility)
-     */
-    private function calculate_with_seventy_percent_logic($base_price, $cromato_olografico_options, $other_options) {
-        // If no Cromato/Olográfico, use normal calculation
-        if (empty($cromato_olografico_options)) {
-            $total_price = $base_price;
-            foreach ($other_options as $option) {
-                $total_price += $option['price'];
-            }
-            return $total_price;
-        }
-        
-        // If only Cromato/Olográfico (no other options), use normal sum
-        if (empty($other_options)) {
-            $total_price = $base_price;
-            foreach ($cromato_olografico_options as $option) {
-                $total_price += $option['price'];
-            }
-            return $total_price;
-        }
-        
-        // If Cromato/Olográfico + other options, apply 70% logic
-        // Step 1: Sum everything (base + Cromato/Olográfico + other options)
-        $step1_total = $base_price;
-        foreach ($cromato_olografico_options as $option) {
-            $step1_total += $option['price'];
-        }
-        foreach ($other_options as $option) {
-            $step1_total += $option['price'];
-        }
-        
-        // Step 2: Subtract Cromato/Olográfico
-        $cromato_olografico_total = 0;
-        foreach ($cromato_olografico_options as $option) {
-            $cromato_olografico_total += $option['price'];
-        }
-        $step2_without_cromato = $step1_total - $cromato_olografico_total;
-        
-        // Step 3: Calculate 70% of the result
-        $step3_percentage = $step2_without_cromato * 0.70;
-        
-        // Step 4: Add other options
-        $other_options_total = 0;
-        foreach ($other_options as $option) {
-            $other_options_total += $option['price'];
-        }
-        $final_total = $step3_percentage + $other_options_total;
-        
-        return $base_price + $final_total;
-    }
-    
-    /**
-     * Get product add-ons from YITH
-     */
-    private function get_product_addons($product_id) {
-        if (!class_exists('YITH_WAPO')) {
-            return array();
-        }
-        
-        $addons = array();
-        
-        try {
-            // Method 1: Try to get add-on groups for this product
-            if (method_exists(YITH_WAPO(), 'get_addon_groups_by_product')) {
-                $addon_groups = YITH_WAPO()->get_addon_groups_by_product($product_id);
-                
-                if (!empty($addon_groups)) {
-                    foreach ($addon_groups as $group) {
-                        if (method_exists(YITH_WAPO(), 'get_addons_by_group')) {
-                            $group_addons = YITH_WAPO()->get_addons_by_group($group->id);
-                            
-                            if (!empty($group_addons)) {
-                                foreach ($group_addons as $addon) {
-                                    $addons[] = $addon;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        // Calculate total calculation addons using the normal total as base
+        $total_calculation_addons_price = 0;
+        foreach ($total_calculation_addons as $addon_data) {
+            $option_price = $this->calculate_addon_price_for_total($addon_data, $normal_total, $cart_item);
+            $total_calculation_addons_price += $option_price;
             
-            // Method 2: Try to get all add-ons and filter by product
-            if (empty($addons) && method_exists(YITH_WAPO(), 'get_addons')) {
-                $all_addons = YITH_WAPO()->get_addons();
-                
-                if (!empty($all_addons)) {
-                    foreach ($all_addons as $addon) {
-                        // Check if this addon applies to this product
-                        if ($this->addon_applies_to_product($addon, $product_id)) {
-                            $addons[] = $addon;
-                        }
-                    }
+            error_log('MWM DEBUG: Total calculation addon ' . $addon_data['addon_id'] . ' price: ' . $option_price . ' (calculated on total: ' . $normal_total . ')');
+        }
+        
+        $final_total = $normal_total + $total_calculation_addons_price;
+        
+        error_log('MWM DEBUG: Final calculation:');
+        error_log('MWM DEBUG: - Product price: ' . $base_price);
+        error_log('MWM DEBUG: - Normal addons price: ' . $normal_addons_price);
+        error_log('MWM DEBUG: - Total calculation addons price: ' . $total_calculation_addons_price);
+        error_log('MWM DEBUG: - Final total: ' . $final_total . ' (original was: ' . $cart_item['line_total'] . ')');
+        
+        // Update the cart item with new prices
+        $cart->cart_contents[$cart_item_key]['yith_wapo_total_options_price'] = $normal_addons_price + $total_calculation_addons_price;
+        $cart->cart_contents[$cart_item_key]['line_subtotal'] = $final_total;
+        $cart->cart_contents[$cart_item_key]['line_total'] = $final_total;
+        
+        // Update the product price in the cart item
+        $cart->cart_contents[$cart_item_key]['data']->set_price($final_total);
+        
+        error_log('MWM DEBUG: Updated cart item prices:');
+        error_log('MWM DEBUG: - yith_wapo_total_options_price: ' . ($normal_addons_price + $total_calculation_addons_price));
+        error_log('MWM DEBUG: - line_subtotal: ' . $final_total);
+        error_log('MWM DEBUG: - line_total: ' . $final_total);
+    }
+    
+    /**
+     * Modify YITH WAPO total calculation by addons list to handle calculate_on_total
+     */
+    public function modify_yith_total_by_add_ons_list($total_price, $type_list, $cart_item) {
+        error_log('MWM DEBUG: modify_yith_total_by_add_ons_list called - Total: ' . $total_price);
+        
+        // Get product base price
+        $product_id = isset($cart_item['product_id']) ? $cart_item['product_id'] : $cart_item['item_meta']['_product_id'][0];
+        $_product = wc_get_product($product_id);
+        
+        if (!$_product) {
+            return $total_price;
+        }
+        
+        // WooCommerce Measurement Price Calculator (compatibility)
+        if (isset($cart_item['pricing_item_meta_data']['_price'])) {
+            $product_price = $cart_item['pricing_item_meta_data']['_price'];
+        } else {
+            $product_price = yit_get_display_price($_product);
+        }
+        
+        // Get current cart item data for debugging
+        $current_cart_item = null;
+        if (WC()->cart) {
+            foreach (WC()->cart->get_cart() as $cart_item_key => $item) {
+                if ($item['product_id'] == $product_id) {
+                    $current_cart_item = $item;
+                    break;
                 }
             }
-            
-            // Method 3: Direct database query as fallback
-            if (empty($addons)) {
-                global $wpdb;
-                $addon_table = $wpdb->prefix . 'yith_wapo_addons';
-                
-                if ($wpdb->get_var("SHOW TABLES LIKE '$addon_table'") == $addon_table) {
-                    $db_addons = $wpdb->get_results("SELECT * FROM $addon_table");
+        }
+        
+        if (!$current_cart_item) {
+            error_log('MWM DEBUG: Could not find current cart item');
+            return $total_price;
+        }
+        
+        error_log('MWM DEBUG: Current cart item price: ' . $current_cart_item['yith_wapo_item_price']);
+        error_log('MWM DEBUG: Current total options price: ' . $current_cart_item['yith_wapo_total_options_price']);
+        error_log('MWM DEBUG: Current line total: ' . $current_cart_item['line_total']);
+        
+        // Separate addons into two groups: normal and calculate_on_total
+        $normal_addons = array();
+        $total_calculation_addons = array();
+        
+        foreach ($type_list as $list) {
+            foreach ($list as $key => $value) {
+                if ($key && '' !== $value) {
+                    if (is_array($value) && isset($value[0])) {
+                        $value = $value[0];
+                    }
                     
-                    if (!empty($db_addons)) {
-                        foreach ($db_addons as $db_addon) {
-                            // Convert database row to addon object
-                            $addon = new stdClass();
-                            $addon->id = $db_addon->id;
-                            $addon->settings = maybe_unserialize($db_addon->options);
-                            $addon->title = $db_addon->title ?? '';
-                            $addon->options = maybe_unserialize($db_addon->options);
-                            
-                            if ($this->addon_applies_to_product($addon, $product_id)) {
-                                $addons[] = $addon;
-                            }
-                        }
+                    $values = YITH_WAPO::get_instance()->split_addon_and_option_ids($key, $value);
+                    $addon_id = $values['addon_id'];
+                    $option_id = $values['option_id'];
+                    
+                    // Check if this addon has calculate_on_total enabled
+                    $option_name = 'mwm_calculate_on_total_' . $addon_id;
+                    $calculate_on_total = get_option($option_name, '');
+                    
+                    error_log('MWM DEBUG: Checking addon ' . $addon_id . ' - Option name: ' . $option_name . ', Value: ' . $calculate_on_total);
+                    
+                    $addon_data = array(
+                        'key' => $key,
+                        'value' => $value,
+                        'addon_id' => $addon_id,
+                        'option_id' => $option_id
+                    );
+                    
+                    if ($calculate_on_total === 'yes') {
+                        $total_calculation_addons[] = $addon_data;
+                        error_log('MWM DEBUG: Addon ' . $addon_id . ' has calculate_on_total enabled');
+                    } else {
+                        $normal_addons[] = $addon_data;
+                        error_log('MWM DEBUG: Addon ' . $addon_id . ' does NOT have calculate_on_total enabled (value: ' . $calculate_on_total . ')');
                     }
                 }
             }
-            
-        } catch (Exception $e) {
-            // Log error if needed
-            error_log('MWM Visual Teams: Error getting addons - ' . $e->getMessage());
         }
         
-        return $addons;
-    }
-    
-    /**
-     * Check if an addon applies to a specific product
-     */
-    private function addon_applies_to_product($addon, $product_id) {
-        // Check if addon has product restrictions
-        if (isset($addon->settings['products']) && !empty($addon->settings['products'])) {
-            $allowed_products = $addon->settings['products'];
-            if (!in_array($product_id, $allowed_products)) {
-                return false;
-            }
+        error_log('MWM DEBUG: Normal addons: ' . count($normal_addons) . ', Total calculation addons: ' . count($total_calculation_addons));
+        
+        // If no total calculation addons, return original total
+        if (empty($total_calculation_addons)) {
+            error_log('MWM DEBUG: No total calculation addons found, returning original total');
+            return $total_price;
         }
         
-        // Check if addon has category restrictions
-        if (isset($addon->settings['categories']) && !empty($addon->settings['categories'])) {
-            $product_categories = wp_get_post_terms($product_id, 'product_cat', array('fields' => 'ids'));
-            $allowed_categories = $addon->settings['categories'];
+        // Calculate total with normal addons first (using original YITH calculation)
+        $normal_total = $product_price;
+        $normal_addons_price = 0;
+        
+        foreach ($normal_addons as $addon_data) {
+            $option_price = $this->calculate_addon_price_for_total($addon_data, $product_price, $cart_item);
+            $normal_total += $option_price;
+            $normal_addons_price += $option_price;
+        }
+        
+        error_log('MWM DEBUG: Normal total (base + normal addons): ' . $normal_total);
+        error_log('MWM DEBUG: Normal addons price: ' . $normal_addons_price);
+        
+        // Calculate total with calculate_on_total addons using the normal total as base
+        $total_calculation_addons_price = 0;
+        foreach ($total_calculation_addons as $addon_data) {
+            $option_price = $this->calculate_addon_price_for_total($addon_data, $normal_total, $cart_item);
+            $total_calculation_addons_price += $option_price;
             
-            $has_matching_category = false;
-            foreach ($product_categories as $category_id) {
-                if (in_array($category_id, $allowed_categories)) {
-                    $has_matching_category = true;
+            error_log('MWM DEBUG: Total calculation addon ' . $addon_data['addon_id'] . ' price: ' . $option_price . ' (calculated on total: ' . $normal_total . ')');
+        }
+        
+        $final_total = $normal_total + $total_calculation_addons_price;
+        
+        error_log('MWM DEBUG: Final calculation:');
+        error_log('MWM DEBUG: - Product price: ' . $product_price);
+        error_log('MWM DEBUG: - Normal addons price: ' . $normal_addons_price);
+        error_log('MWM DEBUG: - Total calculation addons price: ' . $total_calculation_addons_price);
+        error_log('MWM DEBUG: - Final total: ' . $final_total . ' (original was: ' . $total_price . ')');
+        
+        // Update cart item prices if we're in cart context
+        if (WC()->cart && isset($current_cart_item)) {
+            $cart_item_key = null;
+            foreach (WC()->cart->get_cart() as $key => $item) {
+                if ($item['product_id'] == $product_id) {
+                    $cart_item_key = $key;
                     break;
                 }
             }
             
-            if (!$has_matching_category) {
-                return false;
-            }
-        }
-        
-        // If no restrictions, assume it applies to all products
-        return true;
-    }
-    
-    /**
-     * Calculate option price
-     */
-    private function calculate_option_price($addon, $option_value, $base_price) {
-        $price = 0;
-        
-        // Try to get price from addon settings
-        if (isset($addon->settings['price'])) {
-            $price = floatval($addon->settings['price']);
-        }
-        
-        // Try to get price from options array
-        if (isset($addon->options) && is_array($addon->options)) {
-            foreach ($addon->options as $option) {
-                if (isset($option['label']) && strtolower(trim($option['label'])) === strtolower(trim($option_value))) {
-                    if (isset($option['price'])) {
-                        $price = floatval($option['price']);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // Try to get price from addon settings options
-        if (isset($addon->settings['options']) && is_array($addon->settings['options'])) {
-            foreach ($addon->settings['options'] as $option) {
-                if (isset($option['label']) && strtolower(trim($option['label'])) === strtolower(trim($option_value))) {
-                    if (isset($option['price'])) {
-                        $price = floatval($option['price']);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // If still no price found, try to extract from option_value itself
-        if ($price == 0 && !empty($option_value)) {
-            // Try to extract price from option value (e.g., "Cromato (+238,00 €)")
-            if (preg_match('/\([+]?([0-9]+[.,]?[0-9]*)\s*€\)/', $option_value, $matches)) {
-                $price = floatval(str_replace(',', '.', $matches[1]));
-            }
-        }
-        
-        return $price;
-    }
-    
-    /**
-     * Get option percentage
-     */
-    private function get_option_percentage($addon, $option_value) {
-        // This is a placeholder - adapt to your YITH percentage structure
-        $percentage = 0;
-        
-        if (isset($addon->settings['percentage'])) {
-            $percentage = floatval($addon->settings['percentage']);
-        }
-        
-        return $percentage;
-    }
-    
-    /**
-     * Check if an option is MODELLO CAN AM UTV
-     */
-    private function is_modello_option($addon, $option_value) {
-        // Check if the option value contains MODELLO, CAN AM, or UTV
-        $option_lower = strtolower(trim($option_value));
-        if (strpos($option_lower, 'modello') !== false || 
-            strpos($option_lower, 'can am') !== false || 
-            strpos($option_lower, 'utv') !== false) {
-            return true;
-        }
-        
-        // Check if the addon title contains MODELLO, CAN AM, or UTV
-        if (isset($addon->settings['title'])) {
-            $title_lower = strtolower(trim($addon->settings['title']));
-            if (strpos($title_lower, 'modello') !== false || 
-                strpos($title_lower, 'can am') !== false || 
-                strpos($title_lower, 'utv') !== false) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Check if an option is Cromato or Olográfico
-     */
-    private function is_cromato_olografico_option($addon, $option_value) {
-        // Check if the option value contains Cromato or Olográfico
-        $option_lower = strtolower(trim($option_value));
-        if (strpos($option_lower, 'cromato') !== false || strpos($option_lower, 'olografico') !== false) {
-            return true;
-        }
-        
-        // Check if the addon title contains Cromato or Olográfico
-        if (isset($addon->settings['title'])) {
-            $title_lower = strtolower(trim($addon->settings['title']));
-            if (strpos($title_lower, 'cromato') !== false || strpos($title_lower, 'olografico') !== false) {
-                return true;
-            }
-        }
-        
-        // Check if the addon options contain Cromato or Olográfico
-        if (isset($addon->settings['options']) && is_array($addon->settings['options'])) {
-            foreach ($addon->settings['options'] as $option) {
-                if (isset($option['label'])) {
-                    $label_lower = strtolower(trim($option['label']));
-                    if (strpos($label_lower, 'cromato') !== false || strpos($label_lower, 'olografico') !== false) {
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Get item data for display
-     */
-    public function get_item_data($item_data, $cart_item) {
-        // Add custom data to cart item display if needed
-        return $item_data;
-    }
-    
-    /**
-     * Modify YITH WAPO addon price calculation
-     */
-    public function modify_yith_addon_price($price, $addon, $option, $product) {
-        error_log('MWM DEBUG: modify_yith_addon_price called - Price: ' . $price . ', Addon: ' . $addon->id . ', Option: ' . $option['label']);
-        
-        // Check if this is a Cromato/Olografico option
-        if ($this->is_cromato_olografico_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a Cromato/Olografico option');
-            // Apply 70% calculation
-            $new_price = $price * 0.70;
-            error_log('MWM DEBUG: Price modified from ' . $price . ' to ' . $new_price);
-            return $new_price;
-        }
-        
-        // Check if this is a MODELLO option
-        if ($this->is_modello_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a MODELLO option - keeping original price');
-            return $price;
-        }
-        
-        return $price;
-    }
-    
-    /**
-     * Modify YITH WAPO addon price calculation on cart
-     */
-    public function modify_yith_addon_price_cart($price, $addon, $option, $cart_item) {
-        error_log('MWM DEBUG: modify_yith_addon_price_cart called - Price: ' . $price . ', Addon: ' . $addon->id . ', Option: ' . $option['label']);
-        
-        // Check if this is a Cromato/Olografico option
-        if ($this->is_cromato_olografico_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a Cromato/Olografico option in cart');
-            // Don't modify the price here, let the 70% calculation handle it
-            return $price;
-        }
-        
-        // Check if this is a MODELLO option
-        if ($this->is_modello_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a MODELLO option in cart');
-            // Don't modify the price here, let the 70% calculation handle it
-            return $price;
-        }
-        
-        return $price;
-    }
-    
-    /**
-     * Modify YITH WAPO total calculation
-     */
-    public function modify_yith_total_calculation($price, $addon, $option, $cart_item) {
-        error_log('MWM DEBUG: modify_yith_total_calculation called - Price: ' . $price . ', Addon: ' . $addon->id . ', Option: ' . $option['label']);
-        
-        // Check if this is a Cromato/Olografico option
-        if ($this->is_cromato_olografico_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a Cromato/Olografico option in total calculation');
-            // Don't modify the price here, let the 70% calculation handle it
-            return $price;
-        }
-        
-        // Check if this is a MODELLO option
-        if ($this->is_modello_option($addon, $option['label'])) {
-            error_log('MWM DEBUG: This is a MODELLO option in total calculation');
-            // Don't modify the price here, let the 70% calculation handle it
-            return $price;
-        }
-        
-        return $price;
-    }
-    
-    /**
-     * Before YITH WAPO calculate totals
-     */
-    public function before_yith_calculate_totals($cart_item) {
-        error_log('MWM DEBUG: before_yith_calculate_totals called for product: ' . $cart_item['product_id']);
-        
-        // Check if we have YITH WAPO options
-        if (isset($cart_item['yith_wapo_options']) && !empty($cart_item['yith_wapo_options'])) {
-            error_log('MWM DEBUG: YITH WAPO options found in cart item');
-            
-            // Get YITH add-ons for this product
-            $addons = $this->get_product_addons($cart_item['product_id']);
-            
-            if (!empty($addons)) {
-                $selected_options = array();
-                $cromato_olografico_options = array();
-                $other_options = array();
-                $modello_options = array();
+            if ($cart_item_key) {
+                // Update the cart item with new prices
+                WC()->cart->cart_contents[$cart_item_key]['yith_wapo_item_price'] = $product_price;
+                WC()->cart->cart_contents[$cart_item_key]['yith_wapo_total_options_price'] = $normal_addons_price + $total_calculation_addons_price;
+                WC()->cart->cart_contents[$cart_item_key]['line_subtotal'] = $final_total;
+                WC()->cart->cart_contents[$cart_item_key]['line_total'] = $final_total;
                 
-                // Process selected options
-                foreach ($addons as $addon) {
-                    if (isset($cart_item['yith_wapo_options'][$addon->id])) {
-                        $option_value = $cart_item['yith_wapo_options'][$addon->id];
-                        $option_price = $this->calculate_option_price($addon, $option_value, $cart_item['data']->get_price());
-                        
-                        $option_data = array(
-                            'addon' => $addon,
-                            'value' => $option_value,
-                            'price' => $option_price,
-                            'is_cromato_olografico' => $this->is_cromato_olografico_option($addon, $option_value),
-                            'is_modello' => $this->is_modello_option($addon, $option_value)
-                        );
-                        
-                        $selected_options[] = $option_data;
-                        
-                        if ($option_data['is_modello']) {
-                            $modello_options[] = $option_data;
-                        } elseif ($option_data['is_cromato_olografico']) {
-                            $cromato_olografico_options[] = $option_data;
-                        } else {
-                            $other_options[] = $option_data;
-                        }
-                    }
-                }
+                // Update the product price in the cart item
+                WC()->cart->cart_contents[$cart_item_key]['data']->set_price($final_total);
                 
-                // Check if total calculation is enabled
-                $has_total_calculation = false;
-                foreach ($selected_options as $option) {
-                    if (isset($option['addon']->settings['calculate_on_total']) && $option['addon']->settings['calculate_on_total'] === 'yes') {
-                        $has_total_calculation = true;
-                        break;
-                    }
-                }
-                
-                if ($has_total_calculation) {
-                    error_log('MWM DEBUG: Total calculation enabled, applying 70% logic');
-                    $new_price = $this->calculate_with_modello_logic($cart_item['data']->get_price(), $cromato_olografico_options, $other_options, $modello_options);
-                    error_log('MWM DEBUG: New price calculated: ' . $new_price);
-                    
-                    // Store the calculated price for later use
-                    $cart_item['mwm_calculated_price'] = $new_price;
-                }
+                error_log('MWM DEBUG: Updated cart item prices:');
+                error_log('MWM DEBUG: - yith_wapo_item_price: ' . $product_price);
+                error_log('MWM DEBUG: - yith_wapo_total_options_price: ' . ($normal_addons_price + $total_calculation_addons_price));
+                error_log('MWM DEBUG: - line_subtotal: ' . $final_total);
+                error_log('MWM DEBUG: - line_total: ' . $final_total);
             }
         }
+        
+        return $final_total;
     }
     
     /**
-     * Modify product price based on selected options
+     * Calculate addon price for total calculation
      */
-    public function modify_product_price($price, $product) {
-        // Only work on product pages and if we're not in admin
-        if (is_admin() || !is_product()) {
-            return $price;
+    private function calculate_addon_price_for_total($addon_data, $base_price, $cart_item) {
+        $addon_id = $addon_data['addon_id'];
+        $option_id = $addon_data['option_id'];
+        $value = $addon_data['value'];
+        
+        // Get addon info using YITH WAPO function
+        $info = yith_wapo_get_option_info($addon_id, $option_id);
+        
+        if (!$info) {
+            return 0;
         }
         
-        error_log('MWM DEBUG: modify_product_price called - Price: ' . $price . ', Product ID: ' . $product->get_id());
+        $option_price = 0;
+        $option_price_sale = 0;
         
-        // Check if we have YITH WAPO options selected
-        if (isset($_POST['yith_wapo_options']) && !empty($_POST['yith_wapo_options'])) {
-            error_log('MWM DEBUG: YITH WAPO options found in POST: ' . print_r($_POST['yith_wapo_options'], true));
-            
-            // Get YITH add-ons for this product
-            $addons = $this->get_product_addons($product->get_id());
-            
-            if (!empty($addons)) {
-                $selected_options = array();
-                $cromato_olografico_options = array();
-                $other_options = array();
-                $modello_options = array();
-                
-                // Process selected options
-                foreach ($addons as $addon) {
-                    if (isset($_POST['yith_wapo_options'][$addon->id])) {
-                        $option_value = $_POST['yith_wapo_options'][$addon->id];
-                        $option_price = $this->calculate_option_price($addon, $option_value, $price);
-                        
-                        $option_data = array(
-                            'addon' => $addon,
-                            'value' => $option_value,
-                            'price' => $option_price,
-                            'is_cromato_olografico' => $this->is_cromato_olografico_option($addon, $option_value),
-                            'is_modello' => $this->is_modello_option($addon, $option_value)
-                        );
-                        
-                        $selected_options[] = $option_data;
-                        
-                        if ($option_data['is_modello']) {
-                            $modello_options[] = $option_data;
-                        } elseif ($option_data['is_cromato_olografico']) {
-                            $cromato_olografico_options[] = $option_data;
-                        } else {
-                            $other_options[] = $option_data;
-                        }
-                    }
-                }
-                
-                // Check if total calculation is enabled
-                $has_total_calculation = false;
-                foreach ($selected_options as $option) {
-                    if (isset($option['addon']->settings['calculate_on_total']) && $option['addon']->settings['calculate_on_total'] === 'yes') {
-                        $has_total_calculation = true;
-                        break;
-                    }
-                }
-                
-                if ($has_total_calculation) {
-                    error_log('MWM DEBUG: Total calculation enabled, applying 70% logic');
-                    $new_price = $this->calculate_with_modello_logic($price, $cromato_olografico_options, $other_options, $modello_options);
-                    error_log('MWM DEBUG: New price calculated: ' . $new_price);
-                    return $new_price;
-                }
-            }
-        }
-        
-        return $price;
-    }
-    
-    /**
-     * AJAX endpoint for price calculation
-     */
-    public function ajax_calculate_price() {
-        error_log('MWM DEBUG: AJAX calculate_price called');
-        
-        // Get the product ID and options from POST
-        $product_id = intval($_POST['product_id']);
-        $options = $_POST['options'] ?? array();
-        
-        error_log('MWM DEBUG: Product ID: ' . $product_id . ', Options: ' . print_r($options, true));
-        
-        if (!$product_id) {
-            wp_die('Invalid product ID');
-        }
-        
-        // Get the product
-        $product = wc_get_product($product_id);
-        if (!$product) {
-            wp_die('Product not found');
-        }
-        
-        $base_price = $product->get_price();
-        error_log('MWM DEBUG: Base price: ' . $base_price);
-        
-        // Get YITH add-ons for this product
-        $addons = $this->get_product_addons($product_id);
-        
-        if (empty($addons)) {
-            error_log('MWM DEBUG: No addons found');
-            wp_send_json_success(array('price' => $base_price));
-        }
-        
-        $selected_options = array();
-        $cromato_olografico_options = array();
-        $other_options = array();
-        $modello_options = array();
-        
-        // Process selected options
-        foreach ($addons as $addon) {
-            if (isset($options[$addon->id])) {
-                $option_value = $options[$addon->id];
-                $option_price = $this->calculate_option_price($addon, $option_value, $base_price);
-                
-                $option_data = array(
-                    'addon' => $addon,
-                    'value' => $option_value,
-                    'price' => $option_price,
-                    'is_cromato_olografico' => $this->is_cromato_olografico_option($addon, $option_value),
-                    'is_modello' => $this->is_modello_option($addon, $option_value)
-                );
-                
-                $selected_options[] = $option_data;
-                
-                if ($option_data['is_modello']) {
-                    $modello_options[] = $option_data;
-                } elseif ($option_data['is_cromato_olografico']) {
-                    $cromato_olografico_options[] = $option_data;
-                } else {
-                    $other_options[] = $option_data;
-                }
-            }
-        }
-        
-        // Check if total calculation is enabled
-        $has_total_calculation = false;
-        foreach ($selected_options as $option) {
-            if (isset($option['addon']->settings['calculate_on_total']) && $option['addon']->settings['calculate_on_total'] === 'yes') {
-                $has_total_calculation = true;
-                break;
-            }
-        }
-        
-        if ($has_total_calculation) {
-            error_log('MWM DEBUG: Total calculation enabled, applying 70% logic');
-            $new_price = $this->calculate_with_modello_logic($base_price, $cromato_olografico_options, $other_options, $modello_options);
-            error_log('MWM DEBUG: New price calculated: ' . $new_price);
-            wp_send_json_success(array('price' => $new_price));
+        // Calculate price based on type
+        if ('percentage' === $info['price_type']) {
+            $option_percentage = floatval($info['price']);
+            $option_percentage_sale = floatval($info['price_sale']);
+            $option_price = ($base_price / 100) * $option_percentage;
+            $option_price_sale = ($base_price / 100) * $option_percentage_sale;
+        } elseif ('multiplied' === $info['price_type']) {
+            $option_price = $info['price'] * $value;
+            $option_price_sale = $info['price_sale'] * $value;
+        } elseif ('characters' === $info['price_type']) {
+            $remove_spaces = apply_filters('yith_wapo_remove_spaces', false);
+            $value = $remove_spaces ? str_replace(' ', '', $value) : $value;
+            $value_length = function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
+            $option_price = floatval($info['price']) * $value_length;
+            $option_price_sale = floatval($info['price_sale']) * $value_length;
         } else {
-            // Normal calculation
-            $total_price = $base_price;
-            foreach ($selected_options as $option) {
-                $total_price += $option['price'];
-            }
-            error_log('MWM DEBUG: Normal calculation result: ' . $total_price);
-            wp_send_json_success(array('price' => $total_price));
+            $option_price = $info['price'];
+            $option_price_sale = $info['price_sale'];
         }
+        
+        // Handle number addon type
+        if ('number' === $info['addon_type']) {
+            if ('value_x_product' === $info['price_method']) {
+                $option_price = $value * $base_price;
+            }
+        }
+        
+        // Apply price method (increase/decrease)
+        if ('decrease' === $info['price_method']) {
+            $option_price = -1 * abs($option_price);
+        }
+        
+        // Apply sale price if available
+        if ($option_price_sale > 0 && $option_price_sale < $option_price) {
+            $option_price = $option_price_sale;
+        }
+        
+        // Apply bundle cart item filter
+        $option_price = apply_filters('yith_wapo_addon_prices_on_bundle_cart_item', $option_price);
+        
+        error_log('MWM DEBUG: calculate_addon_price_for_total - Addon: ' . $addon_id . ', Type: ' . $info['price_type'] . ', Method: ' . $info['price_method'] . ', Price: ' . $option_price . ', Base: ' . $base_price);
+        
+        return (float) $option_price;
     }
+    
 } 
