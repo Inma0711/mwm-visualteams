@@ -105,10 +105,39 @@ jQuery(document).ready(function($) {
                     var newPrice = data.individual_addon_prices[addonId];
                     if (newPrice > 0) {
                         $priceElement.html(formatPrice(newPrice));
+                        console.log('MWM: Updated addon', addonId, 'price to:', newPrice);
                     }
                 }
             });
         }
+        
+        // Also update prices in the addon labels (for checkboxes/radio buttons)
+        $('input[name*="yith_wapo"]:checked').each(function() {
+            var $input = $(this);
+            var name = $input.attr('name');
+            var isSelect = $input.is('select');
+            
+            if (!isSelect) {
+                // Extract addon ID from name
+                var match = name.match(/yith_wapo.*?\[.*?(\d+)-(\d+)\]/);
+                if (match) {
+                    var addonId = parseInt(match[1]);
+                    var optionId = parseInt(match[2]);
+                    
+                    if (data.individual_addon_prices && data.individual_addon_prices[addonId]) {
+                        var newPrice = data.individual_addon_prices[addonId];
+                        if (newPrice > 0) {
+                            // Find the price element in the label
+                            var $label = $input.closest('.yith-wapo-option').find('.option-price .woocommerce-Price-amount');
+                            if ($label.length > 0) {
+                                $label.html(formatPrice(newPrice));
+                                console.log('MWM: Updated label price for addon', addonId, 'to:', newPrice);
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
     
     // Function to update the summary table
