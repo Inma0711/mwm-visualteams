@@ -86,6 +86,9 @@ jQuery(document).ready(function($) {
         
         // Update the summary table
         updateSummaryTable(data);
+        
+        // Update the main product price
+        updateMainProductPrice(data);
     }
     
     
@@ -118,6 +121,17 @@ jQuery(document).ready(function($) {
         
         // Update total order price
         $('#wapo-total-order-price .woocommerce-Price-amount').html(formatPrice(data.final_total));
+    }
+    
+    // Function to update the main product price
+    function updateMainProductPrice(data) {
+        // Update the main product price display
+        $('.price .woocommerce-Price-amount .woocommerce-Price-amount').html(formatPrice(data.final_total));
+        
+        // Also update any other price displays that might exist
+        $('.woocommerce-Price-amount .woocommerce-Price-amount').not('#wapo-total-product-price .woocommerce-Price-amount, #wapo-total-options-price .woocommerce-Price-amount, #wapo-total-order-price .woocommerce-Price-amount').html(formatPrice(data.final_total));
+        
+        console.log('MWM: Updated main product price to:', data.final_total);
     }
     
     
