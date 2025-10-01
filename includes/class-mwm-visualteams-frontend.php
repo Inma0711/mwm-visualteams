@@ -28,9 +28,6 @@ class MWM_VisualTeams_Frontend {
             // Add provisional checkboxes for 70% calculation
             add_action('woocommerce_after_single_product_summary', array($this, 'add_provisional_checkboxes'), 15);
             
-            // Test hook that always executes
-            add_action('wp_footer', array($this, 'test_hook'));
-            
             // Add AJAX handlers
             add_action('wp_ajax_mwm_calculate_seventy_percent', array($this, 'calculate_seventy_percent'));
             add_action('wp_ajax_nopriv_mwm_calculate_seventy_percent', array($this, 'calculate_seventy_percent'));
@@ -140,15 +137,6 @@ class MWM_VisualTeams_Frontend {
         $enabled = $this->check_total_calculation_status();
         
         wp_send_json_success(array('enabled' => $enabled));
-    }
-    
-    /**
-     * Test hook to verify plugin is working
-     */
-    public function test_hook() {
-        if (is_product()) {
-            echo '<div style="position: fixed; top: 0; left: 0; background: red; color: white; padding: 10px; z-index: 9999;">TEST: MWM Plugin Working!</div>';
-        }
     }
     
     /**
